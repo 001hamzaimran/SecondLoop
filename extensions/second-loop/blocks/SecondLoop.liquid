@@ -1,0 +1,99 @@
+<div class="SecondLoop vip">
+  <h2>Welcome to Second Loop!</h2>
+  <p>Submit trade-in or payback requests quickly & easily.</p>
+  <button id="second-loop-button" type="button">Payback Form</button>
+</div>
+
+<!-- Modal -->
+<div id="second-loop-modal" class="secondloop-modal" aria-hidden="true" role="dialog" aria-labelledby="sl-modal-title">
+  <div class="secondloop-modal-overlay" data-close></div>
+
+  <div class="secondloop-modal-panel vip-panel" role="document">
+    <header class="secondloop-modal-header">
+      <h3 id="sl-modal-title">Payback / Trade-in Form</h3>
+      <button class="secondloop-close" id="second-loop-close" aria-label="close form">&times;</button>
+    </header>
+
+    <main class="secondloop-modal-body">
+      <form id="second-loop-form" enctype="multipart/form-data" novalidate>
+
+        <!-- Customer Info -->
+        <label class="sl-field">
+          <span class="sl-label">Name *</span>
+          <input type="text" name="name" id="sl-name" required />
+          <div class="sl-error" id="err-name"></div>
+        </label>
+
+        <label class="sl-field">
+          <span class="sl-label">Email *</span>
+          <input type="email" name="email" id="sl-email" required />
+          <div class="sl-error" id="err-email"></div>
+        </label>
+
+        <label class="sl-field">
+          <span class="sl-label">Order ID (optional)</span>
+          <input type="text" name="order_id" id="sl-order-id" />
+        </label>
+
+        <label class="sl-field">
+          <span class="sl-label">Product Name *</span>
+          <input type="text" name="product" id="sl-product" required />
+          <div class="sl-error" id="err-product"></div>
+        </label>
+
+        <label class="sl-field">
+          <span class="sl-label">Base Price *</span>
+          <input type="number" name="base_price" id="sl-base-price" min="0" required />
+          <div class="sl-error" id="err-base-price"></div>
+        </label>
+
+        <label class="sl-field">
+          <span class="sl-label">Quantity (optional)</span>
+          <input type="number" name="quantity" id="sl-quantity" min="1" />
+        </label>
+
+        <label class="sl-field">
+          <span class="sl-label">Condition *</span>
+          <select name="condition" id="sl-condition" required>
+            <option value="">-- select --</option>
+            <option value="new">New</option>
+            <option value="good">Good</option>
+            <option value="fair">Fair</option>
+            <option value="poor">Poor</option>
+          </select>
+          <div class="sl-error" id="err-condition"></div>
+        </label>
+
+        <label class="sl-field">
+          <span class="sl-label">Images (1–8) *</span>
+          <input type="file" name="images" id="sl-images" accept="image/*" multiple />
+          <div class="sl-hint">You can upload up to 8 images (jpg, png).</div>
+          <div class="sl-error" id="err-images"></div>
+          <div id="sl-image-previews" class="sl-previews" aria-live="polite"></div>
+        </label>
+
+        <label class="sl-field">
+          <span class="sl-label">Notes / Description (optional)</span>
+          <textarea name="notes" id="sl-notes" rows="4"></textarea>
+        </label>
+
+        <div class="sl-actions">
+          <button type="submit" id="sl-submit" class="vip-btn">Submit Request</button>
+          <button type="button" id="sl-cancel" class="vip-btn-secondary">Cancel</button>
+        </div>
+
+        <div id="sl-form-message" class="sl-form-message" role="status" aria-live="polite"></div>
+      </form>
+    </main>
+  </div>
+</div>
+
+
+{% schema %}
+{
+  "name": "Second Loop",
+  "target": "section",
+  "stylesheet": "style.css",
+  "javascript": "script.js"
+}
+{% endschema %}
