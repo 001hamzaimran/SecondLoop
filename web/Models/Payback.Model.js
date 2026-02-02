@@ -39,6 +39,24 @@ const PaybackSchema = new mongoose.Schema(
       required: true,
     },
 
+    status: {
+      type: String,
+      default: "pending",
+      enum: ["pending", "approved", "rejected"]
+    },
+
+    approvedCode: {
+      type: String,
+    },
+
+    approvedPrice: {
+      type: Number,
+    },
+
+    approvedAt: {
+      type: Date,
+    },
+
     images: {
       type: [String],
       required: true,

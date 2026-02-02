@@ -5,7 +5,7 @@ const connectDB = async () => {
         return;
     }
     try { 
-        await mongoose.connect("localhost:27017/secondloop");
+        await mongoose.connect("mongodb://localhost:27017/secondloop");
         console.log('MongoDB connected');
     }
     catch (error) {

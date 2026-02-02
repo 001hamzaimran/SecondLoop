@@ -287,7 +287,7 @@
     backdrop-filter: blur(2px);
 }
 
-.ti-modal-panel {
+/* .ti-modal-panel {
     position: relative;
     width: min(1100px, 96%);
     background: linear-gradient(180deg, #fff, #fbfdff);
@@ -295,7 +295,24 @@
     box-shadow: 0 30px 80px rgba(8, 10, 20, 0.35);
     z-index: 2;
     padding: 18px;
+} */
+
+.ti-modal-panel {
+    position: relative;
+    width: 95vw;       /* full width */
+    height: 95vh;      /* full height */
+    max-width: 1400px; /* optional, for very big screens */
+    max-height: 95vh;  /* cap max height */
+    background: linear-gradient(180deg, #fff, #fbfdff);
+    border-radius: 14px;
+    box-shadow: 0 30px 80px rgba(8, 10, 20, 0.35);
+    z-index: 2;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;  /* 🔥 important to prevent content from pushing modal */
 }
+
 
 /* modal head */
 .modal-head {
@@ -317,18 +334,45 @@
 }
 
 /* modal body */
+/* .modal-body {
+    display: flex;
+    gap: 18px;
+    padding: 18px 0;
+} */
+
 .modal-body {
     display: flex;
     gap: 18px;
     padding: 18px 0;
+    flex: 1;           /* fill remaining height of modal */
+    overflow: hidden;  /* keep modal height fixed */
 }
+
+/* .left-col {
+    width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+} */
 
 .left-col {
     width: 420px;
     display: flex;
     flex-direction: column;
     gap: 12px;
+    height: 100%;       /* fill modal body */
 }
+
+/* .preview {
+    background: #fff;
+    border-radius: 12px;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow);
+    min-height: 260px;
+} */
 
 .preview {
     background: #fff;
@@ -338,7 +382,8 @@
     align-items: center;
     justify-content: center;
     box-shadow: var(--shadow);
-    min-height: 260px;
+    flex: 1;           /* fill left-col height */
+    overflow: hidden;  /* prevent image overflow */
 }
 
 .preview img {
@@ -392,11 +437,20 @@
 }
 
 /* right col */
+/* .right-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+} */
+
 .right-col {
     flex: 1;
     display: flex;
     flex-direction: column;
     gap: 14px;
+    overflow-y: auto;  /* allow scrolling if content is tall */
+    padding-right: 6px;
 }
 
 /* price box */
@@ -567,10 +621,12 @@
 
     .left-col {
         width: 100%;
+        height: auto;
     }
 
     .preview {
         min-height: 220px;
+        flex: unset;
     }
 
     .ti-header {

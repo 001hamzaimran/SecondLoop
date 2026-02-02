@@ -7,6 +7,7 @@ import Routes from "./Routes";
 import { QueryProvider, PolarisProvider } from "./components";
 import Tradein from "./pages/Tradein";
 import TradeInRules from "./pages/TradeInRules";
+import Test from "./pages/Test";
 
 export default function App() {
   // Any .tsx or .jsx files in /pages will become a route
@@ -24,6 +25,7 @@ export default function App() {
             <Link to="/" rel="home" />
             <Link to="/tradein" element={<Tradein />} >TradeIn</Link>
             <Link to="/tradeinrules" element={<TradeInRules />} >TradeIn Rules</Link>
+            <Link to="/Test" element={<Test />} >Test</Link>
             {/* <Link to="/Home" element={<HomePage />} >Home</Link> */}
             {/* <Link to="/pagename">{t("NavigationMenu.pageName")}</Link> */}
           </NavMenu>

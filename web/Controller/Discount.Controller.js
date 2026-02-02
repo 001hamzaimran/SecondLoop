@@ -1,0 +1,131 @@
+// Services/discountService.js
+import shopify from "../shopify.js"; // your existing shopify client import
+
+function generateSmartCode() {
+  const words = ["FAST", "SAFE", "CODE", "USER", "PRO", "GOLD"];
+  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const randomWord = words[Math.floor(Math.random() * words.length)];
+  const randomChar = letters[Math.floor(Math.random() * letters.length)];
+  const randomNum = Math.floor(100000 + Math.random() * 900000);
+  return `${randomWord}${randomChar}${randomNum}`;
+}
+
+export async function createShopifyCodeForCustomer(session, payback, options = {}) {
+  if (!session) throw new Error("Shopify session is required");
+  if (!payback || !payback.email) throw new Error("Payback with email is required");
+
+  const client = new shopify.api.clients.Graphql({ session });
+
+  try {
+    const generatedCode = generateSmartCode();
+    const startsAt = new Date().toISOString();
+
+    const {
+      percentage = 100,
+      minPrice = 0,
+      usageLimit = 1,
+      endDays = 30,
+    } = options;
+
+    const endsAtDate = new Date();
+    endsAtDate.setDate(endsAtDate.getDate() + Number(endDays));
+    const endsAt = endsAtDate.toISOString();
+
+    const customerGid = payback.shopifyCustomerId || payback.customerAdminGid || null;
+
+    const basicInput = {
+      title: `${generatedCode} Discount`,
+      // NOTE: Shopify doesn't echo the 'code' field in DiscountCodeBasic type in some API versions,
+      // but we still create the code value locally and send it in the input.
+      code: generatedCode,
+      startsAt,
+      endsAt,
+      customerGets: {
+        value: {
+          percentage: (Number(percentage) || 100) / 100,
+        },
+        items: { all: true },
+      },
+      minimumRequirement: {
+        subtotal: {
+          greaterThanOrEqualToSubtotal: Number(minPrice || 0),
+        },
+      },
+      usageLimit: Number(usageLimit || 1),
+      appliesOncePerCustomer: true,
+    };
+
+    // if (customerGid) {
+    //   basicInput.customerSelection = {
+    //     customers: { add: [customerGid] },
+    //   };
+    // }
+
+    // NOTE: Removed `code` field from selection because it does not exist on DiscountCodeBasic
+    const mutation = `
+      mutation CreateDiscountCode($basicCodeDiscount: DiscountCodeBasicInput!) {
+        discountCodeBasicCreate(basicCodeDiscount: $basicCodeDiscount) {
+          codeDiscountNode {
+            id
+            codeDiscount {
+              ... on DiscountCodeBasic {
+                title
+                startsAt
+                endsAt
+                customerSelection {
+                  ... on DiscountCustomers {
+                    customers { id }
+                  }
+                }
+                customerGets {
+                  value {
+                    ... on DiscountPercentage {
+                      percentage
+                    }
+                  }
+                }
+              }
+            }
+          }
+          userErrors {
+            field
+            message
+          }
+        }
+      }
+    `;
+
+    const variables = { basicCodeDiscount: basicInput };
+
+    const response = await client.query({
+      data: { query: mutation, variables },
+    });
+
+    const result = response?.body?.data?.discountCodeBasicCreate;
+
+    if (!result) {
+      console.error("❌ INVALID SHOPIFY RESPONSE 👉", response?.body);
+      throw new Error("Invalid response from Shopify when creating discount code");
+    }
+
+    if (result.userErrors && result.userErrors.length) {
+      console.error("❌ SHOPIFY USER ERRORS 👉", result.userErrors);
+      throw new Error(result.userErrors.map((u) => u.message).join(" | "));
+    }
+
+    // Success — return the locally generated code (this is the actual code sent to Shopify)
+    return {
+      success: true,
+      code: generatedCode,
+      shopifyResponse: result,
+    };
+  } catch (error) {
+    // full debug logging
+    console.error("🔥 FULL ERROR 👉", JSON.stringify(error, null, 2));
+    if (error.response?.errors) console.error("🔥 GRAPHQL ERRORS 👉", error.response.errors);
+    if (error.response?.errors?.graphQLErrors) console.error("🔥 GRAPHQL ERRORS DETAILS 👉", error.response.errors.graphQLErrors);
+    if (error.body?.errors) console.error("🔥 RESPONSE BODY ERRORS 👉", error.body.errors);
+    throw error;
+  }
+}
+

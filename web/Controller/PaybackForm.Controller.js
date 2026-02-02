@@ -4,6 +4,9 @@ import cloudinary from "../config/cloudnary.js";
 import fs from "fs";
 import path from "path";
 
+import { createShopifyCodeForCustomer } from "./Discount.Controller.js";
+import { sendDiscountEmail } from "../Middleware/EmailCode.Config.js";
+
 const createPaybackForm = async (req, res) => {
   try {
     const {
@@ -81,7 +84,7 @@ const createPaybackForm = async (req, res) => {
     // best-effort cleanup when req.files present
     if (req.files && Array.isArray(req.files)) {
       req.files.forEach(f => {
-        try { fs.unlinkSync(f.path); } catch (err) {}
+        try { fs.unlinkSync(f.path); } catch (err) { }
       });
     }
 
@@ -93,4 +96,438 @@ const createPaybackForm = async (req, res) => {
   }
 };
 
-export { createPaybackForm };
+const getDataPaybackForm = async (req, res) => {
+  try {
+    const paybackFormData = await PaybackModel.find({});
+    res.status(200).json({
+      success: true,
+      data: paybackFormData
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+      error: error.message
+    })
+  }
+}
+
+// ============================== working code ==================
+
+// const updateStatusPaybackForm = async (req, res) => {
+//   try {
+//     const { id, status } = req.body;
+
+//     // Validate status
+//     if (!["pending", "approved", "rejected"].includes(status)) {
+//       return res.status(400).json({ success: false, message: "Invalid status" });
+//     }
+
+//     const payback = await PaybackModel.findById(id);
+//     if (!payback) {
+//       return res.status(404).json({ success: false, message: "Payback not found" });
+//     }
+
+//     // if already same status, just return
+//     if (payback.status === status) {
+//       return res.status(200).json({ success: true, message: "No change needed", data: payback });
+//     }
+
+//     // Update status field
+//     payback.status = status;
+
+//     if (status === "approved") {
+//       // Prepare options: you can set percentage rule and minPrice here or based on other DB config
+//       const options = {
+//         percentage: 100, // or pick from config/threshold
+//         minPrice: payback.basePrice || 0,
+//         usageLimit: 1,
+//         endDays: 14
+//       };
+
+//       // Use shopify session provided by middleware (validateAuthenticatedSession sets it)
+//       const session = res.locals?.shopify?.session;
+//       try {
+//         const result = await createShopifyCodeForCustomer(session, payback, options);
+//         if (result?.success) {
+//           const code = result.code;
+//           payback.approvedCode = code;
+//           payback.approvedPrice = options.percentage === 100 ? payback.basePrice : options.percentage/100 * payback.basePrice;
+//           payback.approvedAt = new Date();
+
+//           // send email
+//           try {
+//             await sendDiscountEmail({
+//               to: payback.email,
+//               code,
+//               amount: payback.approvedPrice,
+//               productName: payback.productName
+//             });
+//           } catch (emailErr) {
+//             console.error("Email send failed:", emailErr);
+//             // don't fail the whole process for email failure — but include the note
+//           }
+//         } else {
+//           // if shopify failed, you may decide to rollback status -> pending. For now we will keep status=approved
+//           console.warn("Shopify code creation did not succeed:", result);
+//         }
+//       } catch (err) {
+//         console.error("Shopify discount creation error:", err);
+//         // You can choose to rollback status or set a flag on payback; here we'll set an error field:
+//         payback.approvedCode = null;
+//       }
+//     }
+
+//     await payback.save();
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Status updated successfully",
+//       data: payback,
+//     });
+//   } catch (error) {
+//     console.error("Update status error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: error.message
+//     });
+//   }
+// };
+
+// ====================testing
+
+const updateStatusPaybackForm = async (req, res) => {
+  try {
+    console.log("=== UPDATE PAYBACK STATUS REQUEST ===");
+    console.log("Request Body:", req.body);
+    console.log("Session:", res.locals?.shopify?.session?.shop);
+
+    const { id, status } = req.body;
+
+    // Validate status
+    if (!["pending", "approved", "rejected"].includes(status)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Invalid status. Must be: pending, approved, or rejected" 
+      });
+    }
+
+    // Find payback request
+    const payback = await PaybackModel.findById(id);
+    if (!payback) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Payback request not found" 
+      });
+    }
+
+    console.log("Found Payback:", {
+      id: payback._id,
+      currentStatus: payback.status,
+      requestedStatus: status,
+      email: payback.email,
+      product: payback.productName
+    });
+
+    // If already same status, just return
+    if (payback.status === status) {
+      return res.status(200).json({ 
+        success: true, 
+        message: "Status is already set to " + status, 
+        data: payback 
+      });
+    }
+
+    // Handle different status changes
+    if (status === "approved") {
+      // =================== APPROVED FLOW ===================
+      console.log("Starting approval process...");
+      
+      // Prepare discount options
+      const options = {
+        percentage: 100,
+        minPrice: payback.basePrice || 0,
+        usageLimit: 1,
+        endDays: 14
+      };
+
+      // Get Shopify session
+      const session = res.locals?.shopify?.session;
+      if (!session) {
+        console.error("Shopify session not found in res.locals");
+        return res.status(401).json({ 
+          success: false, 
+          message: "Shopify authentication required" 
+        });
+      }
+
+      let shopifyResult;
+      try {
+        console.log("Creating Shopify discount code...");
+        shopifyResult = await createShopifyCodeForCustomer(session, payback, options);
+        
+        if (shopifyResult?.success) {
+          const code = shopifyResult.code;
+          console.log("✅ Shopify discount created:", code);
+          
+          // Update payback with approved data
+          payback.status = "approved";
+          payback.approvedCode = code;
+          payback.approvedPrice = options.percentage === 100 
+            ? payback.basePrice 
+            : (options.percentage / 100) * payback.basePrice;
+          payback.approvedAt = new Date();
+          payback.updatedAt = new Date();
+
+          // Save to database FIRST
+          await payback.save();
+          console.log("✅ Payback saved to database");
+
+          // Then send email (async - don't wait for it)
+          console.log("Sending email to:", payback.email);
+          sendDiscountEmail({
+            to: payback.email,
+            code,
+            amount: payback.approvedPrice,
+            productName: payback.productName
+          })
+          .then(emailInfo => {
+            console.log("✅ Email sent successfully:", {
+              messageId: emailInfo.messageId,
+              to: payback.email,
+              code: code
+            });
+            
+            // Optional: Update email sent status in DB
+            PaybackModel.findByIdAndUpdate(id, { 
+              emailSent: true,
+              emailSentAt: new Date()
+            }, { new: true }).catch(err => 
+              console.error("Error updating email status:", err)
+            );
+          })
+          .catch(emailError => {
+            console.error("❌ Email sending failed:", {
+              error: emailError.message,
+              to: payback.email,
+              code: code
+            });
+            
+            // Log error but don't fail the approval
+            PaybackModel.findByIdAndUpdate(id, { 
+              emailError: emailError.message 
+            }, { new: true }).catch(err => 
+              console.error("Error saving email error:", err)
+            );
+          });
+
+          return res.status(200).json({
+            success: true,
+            message: `Request approved! Discount code ${code} has been created. Email sent to ${payback.email}`,
+            data: {
+              ...payback.toObject(),
+              discountCode: code,
+              emailQueued: true
+            }
+          });
+
+        } else {
+          console.error("Shopify discount creation failed:", shopifyResult);
+          
+          // Rollback: Don't approve if discount creation failed
+          return res.status(500).json({
+            success: false,
+            message: "Failed to create discount code on Shopify",
+            error: shopifyResult?.error || "Unknown Shopify error"
+          });
+        }
+
+      } catch (shopifyError) {
+        console.error("❌ Shopify error:", {
+          message: shopifyError.message,
+          stack: shopifyError.stack
+        });
+
+        // Log detailed Shopify error
+        if (shopifyError.response) {
+          console.error("Shopify Response:", shopifyError.response);
+        }
+        if (shopifyError.body) {
+          console.error("Shopify Body:", shopifyError.body);
+        }
+
+        return res.status(500).json({
+          success: false,
+          message: "Shopify discount creation failed",
+          error: shopifyError.message,
+          details: shopifyError.body?.errors || shopifyError.response?.errors
+        });
+      }
+
+    } else if (status === "rejected") {
+      // =================== REJECTED FLOW ===================
+      console.log("Rejecting payback request...");
+      
+      payback.status = "rejected";
+      payback.rejectedAt = new Date();
+      payback.updatedAt = new Date();
+      
+      await payback.save();
+      
+      console.log("✅ Request rejected successfully");
+      
+      return res.status(200).json({
+        success: true,
+        message: "Request has been rejected",
+        data: payback
+      });
+
+    } else {
+      // =================== PENDING FLOW ===================
+      console.log("Setting status to pending...");
+      
+      payback.status = "pending";
+      payback.updatedAt = new Date();
+      payback.approvedCode = undefined;
+      payback.approvedPrice = undefined;
+      payback.approvedAt = undefined;
+      
+      await payback.save();
+      
+      console.log("✅ Status set to pending");
+      
+      return res.status(200).json({
+        success: true,
+        message: "Status updated to pending",
+        data: payback
+      });
+    }
+
+  } catch (error) {
+    console.error("❌ Update status error:", {
+      message: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while updating status",
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+};
+
+
+// const updateStatusPaybackForm = async (req, res) => {
+//   try {
+//     const { id, status } = req.body;
+
+//     if (!["pending", "approved", "rejected"].includes(status)) {
+//       return res.status(400).json({ success: false, message: "Invalid status" });
+//     }
+
+//     const payback = await PaybackModel.findById(id);
+//     if (!payback) {
+//       return res.status(404).json({ success: false, message: "Payback not found" });
+//     }
+
+//     if (payback.status === status) {
+//       return res.status(200).json({
+//         success: true,
+//         message: "No change needed",
+//         data: payback
+//       });
+//     }
+
+//     // 👉 NON-APPROVED CASES (safe)
+//     if (status !== "approved") {
+//       payback.status = status;
+//       await payback.save();
+
+//       return res.status(200).json({
+//         success: true,
+//         message: "Status updated successfully",
+//         data: payback
+//       });
+//     }
+
+//     // =========================
+//     // APPROVED FLOW
+//     // =========================
+//     const options = {
+//       percentage: 100,
+//       minPrice: payback.basePrice || 0,
+//       usageLimit: 1,
+//       endDays: 14
+//     };
+
+//     const session = res.locals?.shopify?.session;
+//     if (!session) {
+//       return res.status(401).json({ success: false, message: "Shopify session missing" });
+//     }
+
+//     let result;
+//     try {
+//       result = await createShopifyCodeForCustomer(session, payback, options);
+//     } catch (err) {
+//       console.error("Shopify discount creation error:", err);
+//       return res.status(500).json({
+//         success: false,
+//         message: "Shopify discount creation failed",
+//         error: err.message
+//       });
+//     }
+
+//     if (!result?.success) {
+//       return res.status(500).json({
+//         success: false,
+//         message: "Failed to create discount on Shopify"
+//       });
+//     }
+
+//     // ✅ ONLY AFTER SUCCESS
+//     const code = result.code;
+
+//     payback.status = "approved";
+//     payback.approvedCode = code;
+//     payback.approvedPrice =
+//       options.percentage === 100
+//         ? payback.basePrice
+//         : (options.percentage / 100) * payback.basePrice;
+
+//     payback.approvedAt = new Date();
+
+//     await payback.save();
+
+//     // Email failure should NOT break approval
+//     try {
+//       await sendDiscountEmail({
+//         to: payback.email,
+//         code,
+//         amount: payback.approvedPrice,
+//         productName: payback.productName
+//       });
+//     } catch (emailErr) {
+//       console.error("Email send failed:", emailErr);
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Payback approved & discount created",
+//       data: payback
+//     });
+
+//   } catch (error) {
+//     console.error("Update status error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal Server Error",
+//       error: error.message
+//     });
+//   }
+// };
+
+export { createPaybackForm, getDataPaybackForm, updateStatusPaybackForm };

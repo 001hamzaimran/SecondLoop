@@ -21,6 +21,7 @@
     "dotenv": "^17.2.3",
     "mongoose": "^9.1.5",
     "multer": "^2.0.2",
+    "nodemailer": "^7.0.13",
     "serve-static": "^1.14.1"
   },
   "devDependencies": {

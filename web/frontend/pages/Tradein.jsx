@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { toast } from "react-toastify"
 import "./Tradein.css";
 
@@ -6,43 +6,44 @@ export default function Tradein() {
   // price rules (you can replace with API values)
   const DEFAULT_PRICES = { good: 5000, fair: 3000, poor: 1000 };
 
-  const [requests, setRequests] = useState([
-    {
-      id: "TI-1287",
-      customer: "Ali Khan",
-      email: "ali@gmail.com",
-      product: "Leather Jacket",
-      condition: "good",
-      status: "pending",
-      date: "2026-01-25",
-      images: [
-        "https://picsum.photos/800/480?1",
-        "https://picsum.photos/800/480?2",
-        "https://picsum.photos/800/480?4",
-      ],
-    },
-    {
-      id: "TI-1279",
-      customer: "Sara Ahmed",
-      email: "sara@gmail.com",
-      product: "Running Shoes",
-      condition: "fair",
-      status: "approved",
-      date: "2026-01-24",
-      images: ["https://picsum.photos/800/480?3"],
-    },
-    {
-      id: "TI-1268",
-      customer: "Bilal Khan",
-      email: "bilal@mail.com",
-      product: "Wool Scarf",
-      condition: "poor",
-      status: "rejected",
-      date: "2026-01-20",
-      images: ["https://picsum.photos/800/480?5"],
-    },
-  ]);
-
+  // const [requests, setRequests] = useState([
+  //   {
+  //     id: "TI-1287",
+  //     customer: "Ali Khan",
+  //     email: "ali@gmail.com",
+  //     product: "Leather Jacket",
+  //     condition: "good",
+  //     status: "pending",
+  //     date: "2026-01-25",
+  //     images: [
+  //       "https://picsum.photos/800/480?1",
+  //       "https://picsum.photos/800/480?2",
+  //       "https://picsum.photos/800/480?4",
+  //     ],
+  //   },
+  //   {
+  //     id: "TI-1279",
+  //     customer: "Sara Ahmed",
+  //     email: "sara@gmail.com",
+  //     product: "Running Shoes",
+  //     condition: "fair",
+  //     status: "approved",
+  //     date: "2026-01-24",
+  //     images: ["https://picsum.photos/800/480?3"],
+  //   },
+  //   {
+  //     id: "TI-1268",
+  //     customer: "Bilal Khan",
+  //     email: "bilal@mail.com",
+  //     product: "Wool Scarf",
+  //     condition: "poor",
+  //     status: "rejected",
+  //     date: "2026-01-20",
+  //     images: ["https://picsum.photos/800/480?5"],
+  //   },
+  // ]);
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
 
@@ -66,6 +67,46 @@ export default function Tradein() {
       );
     });
   }, [requests, query, filterStatus]);
+
+  async function fetchTradeinRequests() {
+    try {
+      const res = await fetch("/api/get-tradein-request");
+      const data = await res.json();
+
+      if (!data.success) {
+        toast.error("Failed to load trade-in requests");
+        return;
+      }
+
+      // 👇 DB → UI mapping
+      const formatted = data.data.map((item) => ({
+        id: item._id,
+        customer: item.name,
+        email: item.email,
+        product: item.productName,
+        condition: item.condition,
+        status: item.status,
+        date: new Date(item.createdAt).toISOString().slice(0, 10),
+        images: item.images?.length
+          ? item.images.map((img) => img.url || img)
+          : [],
+        basePrice: item.basePrice,
+        quantity: item.quantity,
+        description: item.description,
+      }));
+
+      setRequests(formatted);
+    } catch (err) {
+      console.error(err);
+      toast.error("Server error while loading requests");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchTradeinRequests();
+  }, []);
 
   function formatPrice(n) {
     if (typeof n === "number") return "PKR " + n.toLocaleString();
@@ -98,20 +139,83 @@ export default function Tradein() {
     );
   }
 
-  function handleApprove() {
+  // function handleApprove() {
+  //   if (!selected) return;
+  //   const final = overridePrice ? Number(overridePrice) : computedPriceFor(selected);
+  //   setStatus(selected.id, "approved", final);
+  //   toast.success("Request Approved Successfully")
+  //   closeModal();
+  // }
+
+  async function handleApprove() {
     if (!selected) return;
+
     const final = overridePrice ? Number(overridePrice) : computedPriceFor(selected);
-    setStatus(selected.id, "approved", final);
-    toast.success("Request Approved Successfully")
-    closeModal();
+
+    try {
+      setLoading(true);
+      const res = await fetch("/api/update-tradein-request-status", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: selected.id, status: "approved", approvedPrice: final }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success(`Approved — code ${data.data.approvedCode} sent to ${selected.email}`);
+        setStatus(selected.id, "approved", final);
+        toast.success("Request Approved Successfully");
+        closeModal();
+      } else {
+        toast.error("Failed to approve request");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Server error while approving request");
+    } finally {
+      setLoading(false);
+    }
+
+
   }
 
-  function handleReject() {
+
+  // function handleReject() {
+  //   if (!selected) return;
+  //   setStatus(selected.id, "rejected");
+  //   toast.error("Request Rejected Successfully")
+  //   closeModal();
+  // }
+
+  async function handleReject() {
     if (!selected) return;
-    setStatus(selected.id, "rejected");
-    toast.error("Request Rejected Successfully")
-    closeModal();
+
+    try {
+      setLoading(true);
+      const res = await fetch("/api/update-tradein-request-status", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: selected.id, status: "rejected" }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setStatus(selected.id, "rejected");
+        toast.error("Request Rejected Successfully");
+        closeModal();
+      } else {
+        toast.error("Failed to reject request");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Server error while rejecting request");
+    } finally {
+      setLoading(false);
+    }
+
+
   }
+
 
   function handleIssueCredit() {
     if (!selected) return;
@@ -148,7 +252,7 @@ export default function Tradein() {
           </div>
 
           <select className="status-filter" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-            <option value="all">All statuses</option>
+            <option value="all">All status</option>
             <option value="pending">Pending</option>
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
@@ -195,6 +299,13 @@ export default function Tradein() {
           </thead>
 
           <tbody>
+            {loading && (
+              <tr>
+                <td colSpan="7" style={{ textAlign: "center", padding: "30px" }}>
+                  Loading trade-in requests...
+                </td>
+              </tr>
+            )}
             {filtered.map((r) => {
               const cp = computedPriceFor(r);
               return (
@@ -220,7 +331,8 @@ export default function Tradein() {
 
                   <td>
                     <div className="price-col">
-                      <div className="computed">{formatPrice(cp)}</div>
+                      {/* <div className="computed">{formatPrice(cp)}</div> */}
+                      <div className="computed">{r?.basePrice}</div>
                       <div className="small muted">rule</div>
                     </div>
                   </td>
@@ -263,8 +375,8 @@ export default function Tradein() {
 
               <div className="modal-actions">
                 <button className="btn ghost" onClick={closeModal}>Close</button>
-                <button className="btn primary" onClick={handleApprove}>Approve</button>
-                <button className="btn danger" onClick={handleReject}>Reject</button>
+                <button className="btn primary" onClick={handleApprove}>{loading ? "Approving..." : "Approve"}</button>
+                <button className="btn danger" onClick={handleReject}>{loading ? "Rejecting..." : "Reject"}</button>
               </div>
             </div>
 
@@ -315,7 +427,8 @@ export default function Tradein() {
                   <div className="price-row">
                     <div>
                       <small className="muted">rule price</small>
-                      <div className="rule-price">{formatPrice(computedPriceFor(selected))}</div>
+                      {/* <div className="rule-price">{formatPrice(computedPriceFor(selected))}</div> */}
+                      <div className="rule-price">{selected?.basePrice}</div>
                     </div>
 
                     <div>
@@ -340,13 +453,16 @@ export default function Tradein() {
 
                   <div className="final">
                     <small className="muted">final</small>
-                    <div className="final-price">{formatPrice(overridePrice ? Number(overridePrice) : computedPriceFor(selected))}</div>
+                    {/* <div className="final-price">{formatPrice(overridePrice ? Number(overridePrice) : computedPriceFor(selected))}</div> */}
+                    <div className="final-price">PKR: {selected?.basePrice}</div>
                   </div>
 
                   <div className="modal-cta">
                     <button className="btn" onClick={handleIssueCredit}>Issue Credit</button>
-                    <button className="btn primary" onClick={handleApprove}>Approve</button>
-                    <button className="btn danger" onClick={handleReject}>Reject</button>
+                    <button disabled={loading} className="btn primary" onClick={handleApprove}>{
+                      loading ? "Approving..." : "Approve"
+                    }</button>
+                    <button className="btn danger" onClick={handleReject}>{loading ? "Rejecting..." : "Reject"}</button>
                   </div>
                 </div>
 

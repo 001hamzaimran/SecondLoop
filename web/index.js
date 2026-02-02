@@ -15,7 +15,7 @@ const PORT = parseInt(
   10
 );
 
-connectDB();
+ connectDB();
 
 
 const STATIC_PATH =

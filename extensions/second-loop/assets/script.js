@@ -146,18 +146,18 @@ console.log("Second Loop extension script loaded");
         fd.append("base_price", document.getElementById("sl-base-price").value);
 
         // append all images
-        currentFiles.forEach(file => fd.append("images[]", file, file.name));
+        currentFiles.forEach(file => fd.append("images", file, file.name));
 
         // log all fields including multiple images
         const logData = {};
-        logData["images"] = fd.getAll("images[]"); // array of all filenames
+        logData["images"] = fd.getAll("images"); // array of all filenames
         fd.forEach((value, key) => {
-            if (key !== "images[]") logData[key] = value instanceof File ? value.name : value;
+            if (key !== "images") logData[key] = value instanceof File ? value.name : value;
         });
         console.log("form submitted ->", logData);
 
         // send to backend
-        const endpoint = "/apps/secondloop/payback-form";
+        const endpoint = "/apps/secondloop/payback-form"; // /apps/secondloop/payback-form
         try {
             const res = await fetch(endpoint, { method: "POST", body: fd, credentials: "same-origin" });
             if (!res.ok) throw new Error("server error");
