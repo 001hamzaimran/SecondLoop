@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './Test.css'; // Yeh file neeche CSS hai
 
 const Test = () => {
@@ -17,8 +17,12 @@ const Test = () => {
   const [previews, setPreviews] = useState([]);
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState('');
+  const [products, setProducts] = useState([]);
+  const [productById, setProductById] = useState(null);
   const fileInputRef = useRef(null);
 
+
+  console.log(products, "<<<< products")
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -28,9 +32,47 @@ const Test = () => {
     }
   };
 
+  const fetchProducts = async () => {
+    try {
+      const shopDomain = new URLSearchParams(window.location.search).get("shop");
+
+      const res = await fetch(`/api/products`);
+
+      const products = await res.json();
+      setProducts(products);
+
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+
+  useEffect(() => {
+    fetchProducts()
+  }, [])
+
+
+  const fetchProductById = async (id) => {
+    try {
+      const res = await fetch(`/api/getProductById/${id}`);
+      const product = await res.json();
+      setProductById(product);
+    } catch (error) {
+      console.log(error, "<<< error")
+    }
+  }
+
+
+  useEffect(() => {
+    fetchProductById("8310040002660")
+  }, [])
+
+  console.log(productById, " <<<<< productById")
+
+
   const handleFileChange = (e) => {
     const selectedFiles = Array.from(e.target.files);
-    
+
     // Check total files limit
     if (files.length + selectedFiles.length > 8) {
       setErrors(prev => ({ ...prev, images: 'Maximum 8 images allowed' }));
@@ -38,7 +80,7 @@ const Test = () => {
     }
 
     // Filter images only
-    const imageFiles = selectedFiles.filter(file => 
+    const imageFiles = selectedFiles.filter(file =>
       file.type.startsWith('image/')
     );
 
@@ -72,15 +114,15 @@ const Test = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    
+
     if (!formData.name.trim()) newErrors.name = 'Name is required';
-    
+
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Enter a valid email';
     }
-    
+
     if (!formData.product.trim()) newErrors.product = 'Product name is required';
     if (!formData.base_price) newErrors.base_price = 'Base price is required';
     if (!formData.condition) newErrors.condition = 'Please select condition';
@@ -93,19 +135,19 @@ const Test = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       setMessage('Please fix the errors above');
       return;
     }
 
     const formDataToSend = new FormData();
-    
+
     // Append text fields
     Object.entries(formData).forEach(([key, value]) => {
       if (value) formDataToSend.append(key, value);
     });
-    
+
     // Append all files
     files.forEach(file => {
       formDataToSend.append('images', file);
@@ -172,12 +214,12 @@ const Test = () => {
   return (
     <div className="test-container">
       <h1>Second Loop Test Page</h1>
-      
+
       <div className="test-actions">
         <button onClick={() => testApi()} className="test-btn">
           Test Simple API Call
         </button>
-        
+
         <button onClick={() => setShowModal(true)} className="open-form-btn">
           Open Payback Form
         </button>
@@ -310,7 +352,7 @@ const Test = () => {
                   />
                   <small>You can upload up to 8 images (jpg, png)</small>
                   {errors.images && <div className="error">{errors.images}</div>}
-                  
+
                   {/* Image Previews */}
                   <div className="image-previews">
                     {previews.map((preview, index) => (

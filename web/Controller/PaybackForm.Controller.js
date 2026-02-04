@@ -14,6 +14,7 @@ const createPaybackForm = async (req, res) => {
       email,
       order_id,
       product,
+      product_id,
       quantity,
       base_price,
       condition,
@@ -66,6 +67,7 @@ const createPaybackForm = async (req, res) => {
       email,
       orderId: order_id,
       productName: product,
+      productId: product_id,
       quantity: quantity ? Number(quantity) : undefined,
       basePrice: Number(base_price),
       condition: condition?.toLowerCase() || "good",
@@ -203,22 +205,22 @@ const updateStatusPaybackForm = async (req, res) => {
     console.log("Request Body:", req.body);
     console.log("Session:", res.locals?.shopify?.session?.shop);
 
-    const { id, status } = req.body;
+    const { id, status, approvedPrice: approvedPriceFromReq, percentage: percentageFromReq } = req.body;
 
     // Validate status
     if (!["pending", "approved", "rejected"].includes(status)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Invalid status. Must be: pending, approved, or rejected" 
+      return res.status(400).json({
+        success: false,
+        message: "Invalid status. Must be: pending, approved, or rejected"
       });
     }
 
     // Find payback request
     const payback = await PaybackModel.findById(id);
     if (!payback) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Payback request not found" 
+      return res.status(404).json({
+        success: false,
+        message: "Payback request not found"
       });
     }
 
@@ -232,10 +234,10 @@ const updateStatusPaybackForm = async (req, res) => {
 
     // If already same status, just return
     if (payback.status === status) {
-      return res.status(200).json({ 
-        success: true, 
-        message: "Status is already set to " + status, 
-        data: payback 
+      return res.status(200).json({
+        success: true,
+        message: "Status is already set to " + status,
+        data: payback
       });
     }
 
@@ -243,11 +245,37 @@ const updateStatusPaybackForm = async (req, res) => {
     if (status === "approved") {
       // =================== APPROVED FLOW ===================
       console.log("Starting approval process...");
-      
+
       // Prepare discount options
+      // const options = {
+      //   percentage: 100,
+      //   minPrice: payback.basePrice || 0,
+      //   usageLimit: 1,
+      //   endDays: 14
+      // };
+
+      // Determine percentage (0-100). If frontend provided percentage use it, otherwise default 100.
+      const percentage = Number(percentageFromReq ?? 100);
+      if (Number.isNaN(percentage) || percentage < 0 || percentage > 100) {
+        return res.status(400).json({ success: false, message: "percentage must be a number between 0 and 100" });
+      }
+
+      // Determine final approvedPrice:
+      let finalPrice;
+      if (approvedPriceFromReq !== undefined && approvedPriceFromReq !== null && approvedPriceFromReq !== "") {
+        finalPrice = Number(approvedPriceFromReq);
+        if (Number.isNaN(finalPrice) || finalPrice < 0) {
+          return res.status(400).json({ success: false, message: "approvedPrice must be a valid number" });
+        }
+      } else {
+        // compute from percentage
+        finalPrice = Math.round((percentage / 100) * (payback.basePrice || 0));
+      }
+
+      // Build options for discount creation
       const options = {
-        percentage: 100,
-        minPrice: payback.basePrice || 0,
+        percentage: percentage,
+        minPrice: 1, // optionally you can set floor here
         usageLimit: 1,
         endDays: 14
       };
@@ -256,26 +284,26 @@ const updateStatusPaybackForm = async (req, res) => {
       const session = res.locals?.shopify?.session;
       if (!session) {
         console.error("Shopify session not found in res.locals");
-        return res.status(401).json({ 
-          success: false, 
-          message: "Shopify authentication required" 
+        return res.status(401).json({
+          success: false,
+          message: "Shopify authentication required"
         });
       }
 
       let shopifyResult;
       try {
-        console.log("Creating Shopify discount code...");
+        console.log("Creating Shopify discount code for customer:", payback.email, "options:", options);
         shopifyResult = await createShopifyCodeForCustomer(session, payback, options);
-        
+
         if (shopifyResult?.success) {
           const code = shopifyResult.code;
           console.log("✅ Shopify discount created:", code);
-          
+
           // Update payback with approved data
           payback.status = "approved";
           payback.approvedCode = code;
-          payback.approvedPrice = options.percentage === 100 
-            ? payback.basePrice 
+          payback.approvedPrice = options.percentage === 100
+            ? payback.basePrice
             : (options.percentage / 100) * payback.basePrice;
           payback.approvedAt = new Date();
           payback.updatedAt = new Date();
@@ -292,35 +320,35 @@ const updateStatusPaybackForm = async (req, res) => {
             amount: payback.approvedPrice,
             productName: payback.productName
           })
-          .then(emailInfo => {
-            console.log("✅ Email sent successfully:", {
-              messageId: emailInfo.messageId,
-              to: payback.email,
-              code: code
+            .then(emailInfo => {
+              console.log("✅ Email sent successfully:", {
+                messageId: emailInfo.messageId,
+                to: payback.email,
+                code: code
+              });
+
+              // Optional: Update email sent status in DB
+              PaybackModel.findByIdAndUpdate(id, {
+                emailSent: true,
+                emailSentAt: new Date()
+              }, { new: true }).catch(err =>
+                console.error("Error updating email status:", err)
+              );
+            })
+            .catch(emailError => {
+              console.error("❌ Email sending failed:", {
+                error: emailError.message,
+                to: payback.email,
+                code: code
+              });
+
+              // Log error but don't fail the approval
+              PaybackModel.findByIdAndUpdate(id, {
+                emailError: emailError.message
+              }, { new: true }).catch(err =>
+                console.error("Error saving email error:", err)
+              );
             });
-            
-            // Optional: Update email sent status in DB
-            PaybackModel.findByIdAndUpdate(id, { 
-              emailSent: true,
-              emailSentAt: new Date()
-            }, { new: true }).catch(err => 
-              console.error("Error updating email status:", err)
-            );
-          })
-          .catch(emailError => {
-            console.error("❌ Email sending failed:", {
-              error: emailError.message,
-              to: payback.email,
-              code: code
-            });
-            
-            // Log error but don't fail the approval
-            PaybackModel.findByIdAndUpdate(id, { 
-              emailError: emailError.message 
-            }, { new: true }).catch(err => 
-              console.error("Error saving email error:", err)
-            );
-          });
 
           return res.status(200).json({
             success: true,
@@ -334,7 +362,7 @@ const updateStatusPaybackForm = async (req, res) => {
 
         } else {
           console.error("Shopify discount creation failed:", shopifyResult);
-          
+
           // Rollback: Don't approve if discount creation failed
           return res.status(500).json({
             success: false,
@@ -368,15 +396,15 @@ const updateStatusPaybackForm = async (req, res) => {
     } else if (status === "rejected") {
       // =================== REJECTED FLOW ===================
       console.log("Rejecting payback request...");
-      
+
       payback.status = "rejected";
       payback.rejectedAt = new Date();
       payback.updatedAt = new Date();
-      
+
       await payback.save();
-      
+
       console.log("✅ Request rejected successfully");
-      
+
       return res.status(200).json({
         success: true,
         message: "Request has been rejected",
@@ -386,17 +414,17 @@ const updateStatusPaybackForm = async (req, res) => {
     } else {
       // =================== PENDING FLOW ===================
       console.log("Setting status to pending...");
-      
+
       payback.status = "pending";
       payback.updatedAt = new Date();
       payback.approvedCode = undefined;
       payback.approvedPrice = undefined;
       payback.approvedAt = undefined;
-      
+
       await payback.save();
-      
+
       console.log("✅ Status set to pending");
-      
+
       return res.status(200).json({
         success: true,
         message: "Status updated to pending",
@@ -419,115 +447,5 @@ const updateStatusPaybackForm = async (req, res) => {
     });
   }
 };
-
-
-// const updateStatusPaybackForm = async (req, res) => {
-//   try {
-//     const { id, status } = req.body;
-
-//     if (!["pending", "approved", "rejected"].includes(status)) {
-//       return res.status(400).json({ success: false, message: "Invalid status" });
-//     }
-
-//     const payback = await PaybackModel.findById(id);
-//     if (!payback) {
-//       return res.status(404).json({ success: false, message: "Payback not found" });
-//     }
-
-//     if (payback.status === status) {
-//       return res.status(200).json({
-//         success: true,
-//         message: "No change needed",
-//         data: payback
-//       });
-//     }
-
-//     // 👉 NON-APPROVED CASES (safe)
-//     if (status !== "approved") {
-//       payback.status = status;
-//       await payback.save();
-
-//       return res.status(200).json({
-//         success: true,
-//         message: "Status updated successfully",
-//         data: payback
-//       });
-//     }
-
-//     // =========================
-//     // APPROVED FLOW
-//     // =========================
-//     const options = {
-//       percentage: 100,
-//       minPrice: payback.basePrice || 0,
-//       usageLimit: 1,
-//       endDays: 14
-//     };
-
-//     const session = res.locals?.shopify?.session;
-//     if (!session) {
-//       return res.status(401).json({ success: false, message: "Shopify session missing" });
-//     }
-
-//     let result;
-//     try {
-//       result = await createShopifyCodeForCustomer(session, payback, options);
-//     } catch (err) {
-//       console.error("Shopify discount creation error:", err);
-//       return res.status(500).json({
-//         success: false,
-//         message: "Shopify discount creation failed",
-//         error: err.message
-//       });
-//     }
-
-//     if (!result?.success) {
-//       return res.status(500).json({
-//         success: false,
-//         message: "Failed to create discount on Shopify"
-//       });
-//     }
-
-//     // ✅ ONLY AFTER SUCCESS
-//     const code = result.code;
-
-//     payback.status = "approved";
-//     payback.approvedCode = code;
-//     payback.approvedPrice =
-//       options.percentage === 100
-//         ? payback.basePrice
-//         : (options.percentage / 100) * payback.basePrice;
-
-//     payback.approvedAt = new Date();
-
-//     await payback.save();
-
-//     // Email failure should NOT break approval
-//     try {
-//       await sendDiscountEmail({
-//         to: payback.email,
-//         code,
-//         amount: payback.approvedPrice,
-//         productName: payback.productName
-//       });
-//     } catch (emailErr) {
-//       console.error("Email send failed:", emailErr);
-//     }
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Payback approved & discount created",
-//       data: payback
-//     });
-
-//   } catch (error) {
-//     console.error("Update status error:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Internal Server Error",
-//       error: error.message
-//     });
-//   }
-// };
 
 export { createPaybackForm, getDataPaybackForm, updateStatusPaybackForm };

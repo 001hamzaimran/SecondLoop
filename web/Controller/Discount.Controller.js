@@ -22,7 +22,7 @@ export async function createShopifyCodeForCustomer(session, payback, options = {
 
     const {
       percentage = 100,
-      minPrice = 0,
+      minPrice = 1,
       usageLimit = 1,
       endDays = 30,
     } = options;
@@ -32,6 +32,8 @@ export async function createShopifyCodeForCustomer(session, payback, options = {
     const endsAt = endsAtDate.toISOString();
 
     const customerGid = payback.shopifyCustomerId || payback.customerAdminGid || null;
+
+    
 
     const basicInput = {
       title: `${generatedCode} Discount`,
@@ -53,6 +55,7 @@ export async function createShopifyCodeForCustomer(session, payback, options = {
       },
       usageLimit: Number(usageLimit || 1),
       appliesOncePerCustomer: true,
+        customerSelection: { all: true }
     };
 
     // if (customerGid) {

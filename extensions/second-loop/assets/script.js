@@ -1,3 +1,4 @@
+
 console.log("Second Loop extension script loaded");
 
 (function () {
@@ -11,14 +12,27 @@ console.log("Second Loop extension script loaded");
     const imageInput = document.getElementById("sl-images");
     const previews = document.getElementById("sl-image-previews");
     const formMessage = document.getElementById("sl-form-message");
+    const selectedProductBox = document.getElementById("sl-selected-product");
 
+    // ---------- NEW: product elements ----------
+    const productInput = document.getElementById("sl-product");
+    const productDatalist = document.getElementById("sl-product-list");
+    const suggestionsContainer = document.getElementById("sl-product-suggestions");
+    const productIdHidden = document.getElementById("sl-product-id");
+
+    // ---------- state ----------
     let currentFiles = []; // all selected images
+    let allProducts = []; // will hold products from backend
+    let suggestionTimeout = null;
+    let productsLoaded = false;
 
-    // utility: show modal
     function showModal() {
         modal.setAttribute("aria-hidden", "false");
         setTimeout(() => document.getElementById("sl-name").focus(), 10);
         document.addEventListener("keydown", onKeyDown);
+
+        // 🔥 load products when modal opens
+        loadProductsOnce();
     }
 
     function hideModal() {
@@ -29,6 +43,10 @@ console.log("Second Loop extension script loaded");
         clearErrors();
         formMessage.textContent = "";
         document.removeEventListener("keydown", onKeyDown);
+
+        // clear product suggestions and hidden id on close
+        if (suggestionsContainer) suggestionsContainer.innerHTML = "";
+        if (productIdHidden) productIdHidden.value = "";
     }
 
     function onKeyDown(e) {
@@ -145,6 +163,11 @@ console.log("Second Loop extension script loaded");
         fd.append("notes", document.getElementById("sl-notes").value.trim());
         fd.append("base_price", document.getElementById("sl-base-price").value);
 
+        // append product_id hidden (new)
+        if (productIdHidden && productIdHidden.value) {
+            fd.append("product_id", productIdHidden.value);
+        }
+
         // append all images
         currentFiles.forEach(file => fd.append("images", file, file.name));
 
@@ -174,5 +197,177 @@ console.log("Second Loop extension script loaded");
             submitBtn.textContent = "submit request";
         }
     });
+
+    // ===========================
+    // ===== PRODUCT AUTOCOMPLETE
+    // ===========================
+    // load products once from API
+    async function loadProductsOnce() {
+        if (productsLoaded) return;
+        try {
+            const res = await fetch(`/apps/secondloop/products?shop=${Shopify.shop}`, { credentials: "same-origin" });
+            if (!res.ok) throw new Error("failed to load products");
+            const json = await res.json();
+            // accept both array or object with products prop
+            allProducts = Array.isArray(json) ? json : (json.products || []);
+            productsLoaded = true;
+            populateDatalist(allProducts);
+        } catch (err) {
+            console.warn("Could not load products:", err);
+            allProducts = [];
+            productsLoaded = true; // avoid retry spam
+        }
+    }
+
+    function populateDatalist(products) {
+        if (!productDatalist) return;
+        productDatalist.innerHTML = "";
+        products.forEach(p => {
+            const opt = document.createElement("option");
+            opt.value = p.title || p.handle || "";
+            productDatalist.appendChild(opt);
+        });
+    }
+
+    // filter products by query
+    function filterProducts(query) {
+        if (!query) return [];
+        const q = query.trim().toLowerCase();
+        return allProducts.filter(p => {
+            const title = (p.title || "").toLowerCase();
+            const handle = (p.handle || "").toLowerCase();
+            const vendor = (p.vendor || "").toLowerCase();
+            return title.includes(q) || handle.includes(q) || vendor.includes(q);
+        });
+    }
+
+    // render suggestion cards
+    function renderSuggestions(matches) {
+        if (!suggestionsContainer) return;
+        suggestionsContainer.innerHTML = "";
+        if (!matches || matches.length === 0) {
+            suggestionsContainer.style.display = "none";
+            return;
+        }
+        suggestionsContainer.style.display = "block";
+
+        matches.slice(0, 6).forEach(p => {
+            const card = document.createElement("div");
+            // card.className = "sl-suggestion-card";
+            card.className = "sl-product-card";
+
+            const thumb = document.createElement("div");
+            thumb.className = "sl-suggestion-thumb";
+            const img = document.createElement("img");
+            const imgNode = p.images && p.images.nodes && p.images.nodes[0];
+            img.src = (imgNode && imgNode.url) ? imgNode.url : "";
+            img.alt = (imgNode && imgNode.altText) ? imgNode.altText : (p.title || "");
+            thumb.appendChild(img);
+            card.appendChild(thumb);
+
+            const meta = document.createElement("div");
+            meta.className = "sl-suggestion-meta";
+            const titleEl = document.createElement("div");
+            titleEl.className = "sl-suggestion-title";
+            titleEl.textContent = p.title || p.handle || "Untitled";
+            const vendorEl = document.createElement("div");
+            vendorEl.className = "sl-suggestion-vendor";
+            vendorEl.textContent = p.vendor || "";
+            const handleEl = document.createElement("div");
+            handleEl.className = "sl-suggestion-handle";
+            handleEl.textContent = p.handle || "";
+            meta.appendChild(titleEl);
+            meta.appendChild(vendorEl);
+            meta.appendChild(handleEl);
+            card.appendChild(meta);
+
+            card.addEventListener("click", () => {
+                selectProduct(p);
+            });
+
+            suggestionsContainer.appendChild(card);
+        });
+    }
+
+    // when user selects a product card
+    function selectProduct(product) {
+        productInput.value = product.title || product.handle || "";
+        if (productIdHidden) productIdHidden.value = product.id || "";
+
+        // hide suggestions
+        if (suggestionsContainer) {
+            suggestionsContainer.innerHTML = "";
+            suggestionsContainer.style.display = "none";
+        }
+
+        // show selected card permanently
+        if (!selectedProductBox) return;
+
+        selectedProductBox.innerHTML = "";
+
+        const card = document.createElement("div");
+        card.className = "sl-selected-card";
+
+        const img = document.createElement("img");
+        const imgNode = product.images && product.images.nodes && product.images.nodes[0];
+        img.src = (imgNode && imgNode.url) ? imgNode.url : "";
+
+        const info = document.createElement("div");
+        info.className = "sl-selected-info";
+
+        const title = document.createElement("div");
+        title.textContent = product.title || "";
+
+        const vendor = document.createElement("small");
+        vendor.textContent = product.vendor || "";
+
+        info.appendChild(title);
+        info.appendChild(vendor);
+
+        card.appendChild(img);
+        card.appendChild(info);
+
+        selectedProductBox.appendChild(card);
+    }
+
+    // try to auto-select product_id if exact title match (for datalist native selection)
+    function tryAutoSelectByTitle(title) {
+        if (!title) return;
+        const match = allProducts.find(p => (p.title || "").toLowerCase() === title.toLowerCase());
+        if (match && productIdHidden) productIdHidden.value = match.id || "";
+    }
+
+    // wire input events
+    if (productInput) {
+        productInput.addEventListener("focus", async () => {
+            await loadProductsOnce();
+            // show top suggestions on focus
+            renderSuggestions(allProducts.slice(0, 6));
+        });
+        productInput.addEventListener("input", async (e) => {
+            const q = e.target.value;
+
+            // 🔥 ALWAYS ensure products loaded first
+            await loadProductsOnce();
+
+            if (productIdHidden) productIdHidden.value = "";
+
+            const matches = filterProducts(q);
+
+            renderSuggestions(matches);
+            populateDatalist(matches.slice(0, 30));
+            tryAutoSelectByTitle(q);
+        });
+
+        // on blur hide suggestions (allow click by small delay)
+        productInput.addEventListener("blur", () => {
+            setTimeout(() => {
+                if (suggestionsContainer) {
+                    suggestionsContainer.innerHTML = "";
+                    suggestionsContainer.style.display = "none";
+                }
+            }, 200);
+        });
+    }
 
 })();

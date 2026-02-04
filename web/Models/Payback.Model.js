@@ -22,6 +22,10 @@ const PaybackSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    productId: {
+      type: String,
+      required: true,
+    },
 
     quantity: {
       type: Number,
@@ -51,6 +55,18 @@ const PaybackSchema = new mongoose.Schema(
 
     approvedPrice: {
       type: Number,
+    },
+
+    // NEW: percentage (0-100) that admin sets when approving
+    percentage: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+
+    // OPTIONAL: persist shopify customer gid for faster future requests
+    shopifyCustomerId: {
+      type: String,
     },
 
     approvedAt: {

@@ -9,6 +9,7 @@ import shopify from "./shopify.js";
 import productCreator from "./product-creator.js";
 import PrivacyWebhookHandlers from "./privacy.js";
 import PaybackRouter from "./Routes/Payback.Route.js";
+import ProductRouter from "./Routes/Product.Route.js";
 
 const PORT = parseInt(
   process.env.BACKEND_PORT || process.env.PORT || "3000",
@@ -57,7 +58,7 @@ app.use("/api/*", shopify.validateAuthenticatedSession());
 app.use("/proxy/*", authenticateUser);
 
 
-const routes = [PaybackRouter]
+const routes = [PaybackRouter ,ProductRouter]
 
 routes.forEach((route) => {
   app.use("/api", route);

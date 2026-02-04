@@ -16,40 +16,56 @@
 
     <main class="secondloop-modal-body">
       <form id="second-loop-form" enctype="multipart/form-data" novalidate>
-
         <!-- Customer Info -->
         <label class="sl-field">
           <span class="sl-label">Name *</span>
-          <input type="text" name="name" id="sl-name" required />
+          <input type="text" name="name" id="sl-name" required>
           <div class="sl-error" id="err-name"></div>
         </label>
 
         <label class="sl-field">
           <span class="sl-label">Email *</span>
-          <input type="email" name="email" id="sl-email" required />
+          <input type="email" name="email" id="sl-email" required>
           <div class="sl-error" id="err-email"></div>
         </label>
 
         <label class="sl-field">
           <span class="sl-label">Order ID (optional)</span>
-          <input type="text" name="order_id" id="sl-order-id" />
+          <input type="text" name="order_id" id="sl-order-id">
         </label>
+
+        {% comment %}
+          <label class="sl-field">
+            <span class="sl-label">Product Name *</span>
+            <input type="text" name="product" id="sl-product" required />
+            <div class="sl-error" id="err-product"></div>
+          </label>
+        {% endcomment %}
 
         <label class="sl-field">
           <span class="sl-label">Product Name *</span>
-          <input type="text" name="product" id="sl-product" required />
+
+          <input type="text" name="product" id="sl-product" required>
+
           <div class="sl-error" id="err-product"></div>
+
+          <div id="sl-product-suggestions" class="sl-suggestions"></div>
+
+          <!-- ADD THIS -->
+          <div id="sl-selected-product" class="sl-selected-product-box"></div>
+
+          <input type="hidden" name="product_id" id="sl-product-id">
         </label>
 
         <label class="sl-field">
           <span class="sl-label">Base Price *</span>
-          <input type="number" name="base_price" id="sl-base-price" min="0" required />
+          <input type="number" name="base_price" id="sl-base-price" min="0" required>
           <div class="sl-error" id="err-base-price"></div>
         </label>
 
         <label class="sl-field">
           <span class="sl-label">Quantity (optional)</span>
-          <input type="number" name="quantity" id="sl-quantity" min="1" />
+          <input type="number" name="quantity" id="sl-quantity" min="1">
         </label>
 
         <label class="sl-field">
@@ -66,7 +82,7 @@
 
         <label class="sl-field">
           <span class="sl-label">Images (1–8) *</span>
-          <input type="file" name="images" id="sl-images" accept="image/*" multiple />
+          <input type="file" name="images" id="sl-images" accept="image/*" multiple>
           <div class="sl-hint">You can upload up to 8 images (jpg, png).</div>
           <div class="sl-error" id="err-images"></div>
           <div id="sl-image-previews" class="sl-previews" aria-live="polite"></div>
@@ -87,7 +103,6 @@
     </main>
   </div>
 </div>
-
 
 {% schema %}
 {

@@ -6,42 +6,6 @@ export default function Tradein() {
   // price rules (you can replace with API values)
   const DEFAULT_PRICES = { good: 5000, fair: 3000, poor: 1000 };
 
-  // const [requests, setRequests] = useState([
-  //   {
-  //     id: "TI-1287",
-  //     customer: "Ali Khan",
-  //     email: "ali@gmail.com",
-  //     product: "Leather Jacket",
-  //     condition: "good",
-  //     status: "pending",
-  //     date: "2026-01-25",
-  //     images: [
-  //       "https://picsum.photos/800/480?1",
-  //       "https://picsum.photos/800/480?2",
-  //       "https://picsum.photos/800/480?4",
-  //     ],
-  //   },
-  //   {
-  //     id: "TI-1279",
-  //     customer: "Sara Ahmed",
-  //     email: "sara@gmail.com",
-  //     product: "Running Shoes",
-  //     condition: "fair",
-  //     status: "approved",
-  //     date: "2026-01-24",
-  //     images: ["https://picsum.photos/800/480?3"],
-  //   },
-  //   {
-  //     id: "TI-1268",
-  //     customer: "Bilal Khan",
-  //     email: "bilal@mail.com",
-  //     product: "Wool Scarf",
-  //     condition: "poor",
-  //     status: "rejected",
-  //     date: "2026-01-20",
-  //     images: ["https://picsum.photos/800/480?5"],
-  //   },
-  // ]);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -53,6 +17,9 @@ export default function Tradein() {
   const [selectedImage, setSelectedImage] = useState(null);
   const [overridePrice, setOverridePrice] = useState("");
   const [allowManual, setAllowManual] = useState(true);
+
+  // NEW: percentage state (0-100). default 100 (full)
+  const [percentage, setPercentage] = useState(100);
 
   // derived list
   const filtered = useMemo(() => {
@@ -123,12 +90,15 @@ export default function Tradein() {
     setSelectedImage(request.images && request.images[0]);
     setOverridePrice(""); // reset override each time
     setModalOpen(true);
+    setPercentage(100);
   }
 
   function closeModal() {
     setModalOpen(false);
     setSelected(null);
     setSelectedImage(null);
+    setPercentage(100);
+    setOverridePrice("");
   }
 
   function setStatus(id, status, finalPrice = null) {
@@ -150,24 +120,42 @@ export default function Tradein() {
   async function handleApprove() {
     if (!selected) return;
 
-    const final = overridePrice ? Number(overridePrice) : computedPriceFor(selected);
+    // const final = overridePrice ? Number(overridePrice) : computedPriceFor(selected);
+    const final = overridePrice ? Number(overridePrice) : Math.round((Number(percentage) / 100) * (selected.basePrice || 0));
 
     try {
       setLoading(true);
       const res = await fetch("/api/update-tradein-request-status", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: selected.id, status: "approved", approvedPrice: final }),
+        body: JSON.stringify({ id: selected.id, status: "approved", approvedPrice: final, percentage: Number(percentage) }),
       });
       const data = await res.json();
 
+      //     if (data.success) {
+      //       toast.success(`Approved — code ${data.data.approvedCode} sent to ${selected.email}`);
+      //       setStatus(selected.id, "approved", final);
+      //       toast.success("Request Approved Successfully");
+      //       closeModal();
+      //     } else {
+      //       toast.error("Failed to approve request");
+      //     }
+      //   } catch (err) {
+      //     console.error(err);
+      //     toast.error("Server error while approving request");
+      //   } finally {
+      //     setLoading(false);
+      //   }
+      // }
+
       if (data.success) {
-        toast.success(`Approved — code ${data.data.approvedCode} sent to ${selected.email}`);
+        // server returns discountCode under data.data.discountCode or data.data.approvedCode depending on your backend
+        const code = data.data?.discountCode || data.data?.approvedCode || "(code)";
+        toast.success(`Approved — code ${code} sent to ${selected.email}`);
         setStatus(selected.id, "approved", final);
-        toast.success("Request Approved Successfully");
         closeModal();
       } else {
-        toast.error("Failed to approve request");
+        toast.error("Failed to approve request: " + (data.message || "unknown"));
       }
     } catch (err) {
       console.error(err);
@@ -175,21 +163,12 @@ export default function Tradein() {
     } finally {
       setLoading(false);
     }
-
-
   }
 
 
-  // function handleReject() {
-  //   if (!selected) return;
-  //   setStatus(selected.id, "rejected");
-  //   toast.error("Request Rejected Successfully")
-  //   closeModal();
-  // }
 
   async function handleReject() {
     if (!selected) return;
-
     try {
       setLoading(true);
       const res = await fetch("/api/update-tradein-request-status", {
@@ -212,17 +191,43 @@ export default function Tradein() {
     } finally {
       setLoading(false);
     }
-
-
   }
+
+  // async function handleReject() {
+  //   if (!selected) return;
+
+  //   try {
+  //     setLoading(true);
+  //     const res = await fetch("/api/update-tradein-request-status", {
+  //       method: "PUT",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ id: selected.id, status: "rejected" }),
+  //     });
+  //     const data = await res.json();
+
+  //     if (data.success) {
+  //       setStatus(selected.id, "rejected");
+  //       toast.error("Request Rejected Successfully");
+  //       closeModal();
+  //     } else {
+  //       toast.error("Failed to reject request");
+  //     }
+  //   } catch (err) {
+  //     console.error(err);
+  //     toast.error("Server error while rejecting request");
+  //   } finally {
+  //     setLoading(false);
+  //   }
+
+
+  // }
 
 
   function handleIssueCredit() {
     if (!selected) return;
-    const final = overridePrice ? Number(overridePrice) : computedPriceFor(selected);
-    // for MVP we just mark approved and store price
+    const final = overridePrice ? Number(overridePrice) : Math.round((Number(percentage) / 100) * (selected.basePrice || 0));
     setStatus(selected.id, "approved", final);
-    toast.success(`issued credit: ${formatPrice(final)} to ${selected.customer}`)
+    toast.success(`issued credit: ${formatPrice(final)} to ${selected.customer}`);
     closeModal();
   }
 
@@ -232,6 +237,8 @@ export default function Tradein() {
     approved: requests.filter((r) => r.status === "approved").length,
     rejected: requests.filter((r) => r.status === "rejected").length,
   };
+
+  const displayFinal = (selected ? (overridePrice ? Number(overridePrice) : Math.round((Number(percentage) / 100) * (selected.basePrice || 0))) : 0);
 
   return (
     <div className="ti-page">
@@ -444,7 +451,30 @@ export default function Tradein() {
                         />
                         <span className="suffix">PKR</span>
                       </div>
-                      <label className="manual-row">
+
+                      {/* NEW: percentage input */}
+                      <div style={{ marginTop: 8 }}>
+                        <small className="muted">percentage (0-100)</small>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={percentage}
+                            onChange={(e) => {
+                              let v = Number(e.target.value);
+                              if (Number.isNaN(v)) v = 0;
+                              if (v > 100) v = 100;
+                              if (v < 0) v = 0;
+                              setPercentage(v);
+                            }}
+                            style={{ width: 90, padding: "6px 8px", borderRadius: 6 }}
+                          />
+                          <span className="muted">%</span>
+                        </div>
+                      </div>
+
+                      <label className="manual-row" style={{ marginTop: 8 }}>
                         <input type="checkbox" checked={allowManual} onChange={(e) => setAllowManual(e.target.checked)} />
                         <span className="muted">allow manual override</span>
                       </label>
@@ -454,7 +484,8 @@ export default function Tradein() {
                   <div className="final">
                     <small className="muted">final</small>
                     {/* <div className="final-price">{formatPrice(overridePrice ? Number(overridePrice) : computedPriceFor(selected))}</div> */}
-                    <div className="final-price">PKR: {selected?.basePrice}</div>
+                    {/* <div className="final-price">PKR: {selected?.basePrice}</div> */}
+                    <div className="final-price">PKR: {displayFinal}</div>
                   </div>
 
                   <div className="modal-cta">
