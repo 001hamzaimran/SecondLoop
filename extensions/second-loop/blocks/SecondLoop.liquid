@@ -4,6 +4,30 @@
   <button id="second-loop-button" type="button">Payback Form</button>
 </div>
 
+<!-- YEH ADD KARO LIQUID KE START MEIN -->
+{% if customer %}
+  <script>
+    // Global customer object
+    window.currentShopifyCustomer = {
+      id: '{{ customer.id }}',
+      email: '{{ customer.email }}',
+      name: '{{ customer.name }}',
+      firstName: '{{ customer.first_name }}',
+      lastName: '{{ customer.last_name }}',
+      phone: '{{ customer.phone }}',
+      ordersCount: {{ customer.orders_count }},
+      totalSpent: {{ customer.total_spent | money_without_currency | remove: ',' }}
+    };
+
+    console.log('Liquid Customer Loaded:', window.currentShopifyCustomer);
+  </script>
+{% else %}
+  <script>
+    window.currentShopifyCustomer = null;
+    console.log('Customer not logged in (guest)');
+  </script>
+{% endif %}
+
 <!-- Modal -->
 <div id="second-loop-modal" class="secondloop-modal" aria-hidden="true" role="dialog" aria-labelledby="sl-modal-title">
   <div class="secondloop-modal-overlay" data-close></div>
@@ -67,6 +91,8 @@
           <span class="sl-label">Quantity (optional)</span>
           <input type="number" name="quantity" id="sl-quantity" min="1">
         </label>
+        <!-- Form ke andar yeh hidden field add karo -->
+        <input type="hidden" name="customer_id" id="customer_id_input">
 
         <label class="sl-field">
           <span class="sl-label">Condition *</span>

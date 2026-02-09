@@ -144,6 +144,40 @@ console.log("Second Loop extension script loaded");
         return ok;
     }
 
+// Customer get karne ka function - SIMPLIFIED
+async function getShopifyCustomer() {
+  // Method 1: Liquid se (Sabse reliable)
+  if (window.currentShopifyCustomer) {
+    console.log('Found customer via Liquid:', window.currentShopifyCustomer);
+    return window.currentShopifyCustomer;
+  }
+  
+  // Method 2: Shopify global object
+  if (typeof Shopify !== 'undefined' && Shopify.customer) {
+    console.log('Found customer via Shopify global:', Shopify.customer);
+    return Shopify.customer;
+  }
+  
+  // Method 3: Check account page (fallback)
+  try {
+    const response = await fetch('/account', { 
+      method: 'GET',
+      credentials: 'same-origin'
+    });
+    if (response.ok) {
+      console.log('Customer is logged in (account page accessible)');
+      return { loggedIn: true };
+    }
+  } catch (error) {
+    // Ignore error
+  }
+  
+  console.log('No customer found - guest user');
+  return null;
+}
+
+
+
     // ===== SUBMIT HANDLER =====
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -153,6 +187,29 @@ console.log("Second Loop extension script loaded");
         submitBtn.disabled = true;
         submitBtn.textContent = "sending...";
 
+        // 1. PEHLE CUSTOMER GET KARO
+        let customerId = '';
+        try {
+            const customer = await getShopifyCustomer();
+            if (customer && customer.id) {
+                customerId = customer.id;
+
+                // Auto-fill name and email if empty
+                const nameField = document.getElementById('sl-name');
+                const emailField = document.getElementById('sl-email');
+
+                if (nameField && !nameField.value.trim() && customer.name) {
+                    nameField.value = customer.name;
+                }
+                if (emailField && !emailField.value.trim() && customer.email) {
+                    emailField.value = customer.email;
+                }
+            }
+        } catch (err) {
+            console.log('Customer fetch skipped:', err);
+        }
+
+        // 2. FORM DATA BANAO (customer_id ke saath)
         const fd = new FormData();
         fd.append("name", document.getElementById("sl-name").value.trim());
         fd.append("email", document.getElementById("sl-email").value.trim());
@@ -163,7 +220,12 @@ console.log("Second Loop extension script loaded");
         fd.append("notes", document.getElementById("sl-notes").value.trim());
         fd.append("base_price", document.getElementById("sl-base-price").value);
 
-        // append product_id hidden (new)
+        // ✅ CUSTOMER ID ADD KARO
+        if (customerId) {
+            fd.append("customer_id", customerId);
+        }
+
+        // append product_id hidden
         if (productIdHidden && productIdHidden.value) {
             fd.append("product_id", productIdHidden.value);
         }
@@ -171,37 +233,36 @@ console.log("Second Loop extension script loaded");
         // append all images
         currentFiles.forEach(file => fd.append("images", file, file.name));
 
-        // log all fields including multiple images
-        const logData = {};
-        logData["images"] = fd.getAll("images"); // array of all filenames
-        fd.forEach((value, key) => {
-            if (key !== "images") logData[key] = value instanceof File ? value.name : value;
-        });
-        console.log("form submitted ->", logData);
+        console.log("Form submitting with customer_id:", customerId);
 
-        // send to backend
-        const endpoint = "/apps/secondloop/payback-form"; // /apps/secondloop/payback-form
+        // 3. BACKEND KO SEND KARO
+        const endpoint = "/apps/secondloop/payback-form";
         try {
-            const res = await fetch(endpoint, { method: "POST", body: fd, credentials: "same-origin" });
-            if (!res.ok) throw new Error("server error");
-            formMessage.textContent = "your request has been submitted. you will receive an email when it's reviewed.";
+            const res = await fetch(endpoint, {
+                method: "POST",
+                body: fd,
+                credentials: "same-origin"
+            });
+
+            if (!res.ok) {
+                const errorText = await res.text();
+                throw new Error(`Server error: ${res.status} - ${errorText}`);
+            }
+
+            const result = await res.json();
+            formMessage.textContent = result.message || "Your request has been submitted.";
             formMessage.style.color = "green";
+
             setTimeout(() => hideModal(), 1500);
         } catch (err) {
-            console.error(err);
-            formMessage.textContent = "request submitted (local simulation).";
-            formMessage.style.color = "green";
-            setTimeout(() => hideModal(), 1200);
+            console.error("Submit error:", err);
+            formMessage.textContent = "Error submitting form. Please try again.";
+            formMessage.style.color = "red";
         } finally {
             submitBtn.disabled = false;
             submitBtn.textContent = "submit request";
         }
     });
-
-    // ===========================
-    // ===== PRODUCT AUTOCOMPLETE
-    // ===========================
-    // load products once from API
     async function loadProductsOnce() {
         if (productsLoaded) return;
         try {

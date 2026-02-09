@@ -19,7 +19,7 @@ export default function Tradein() {
   const [allowManual, setAllowManual] = useState(true);
 
   // NEW: percentage state (0-100). default 100 (full)
-  const [percentage, setPercentage] = useState(100);
+  const [percentage, setPercentage] = useState(10);
 
   // derived list
   const filtered = useMemo(() => {
@@ -60,6 +60,9 @@ export default function Tradein() {
         basePrice: item.basePrice,
         quantity: item.quantity,
         description: item.description,
+        percentage: item.percentage,
+        approvedPrice: item.approvedPrice,
+        approvedCode: item.approvedCode
       }));
 
       setRequests(formatted);
@@ -90,14 +93,14 @@ export default function Tradein() {
     setSelectedImage(request.images && request.images[0]);
     setOverridePrice(""); // reset override each time
     setModalOpen(true);
-    setPercentage(100);
+    setPercentage(request.percentage);
   }
 
   function closeModal() {
     setModalOpen(false);
     setSelected(null);
     setSelectedImage(null);
-    setPercentage(100);
+    setPercentage(10);
     setOverridePrice("");
   }
 
@@ -193,45 +196,102 @@ export default function Tradein() {
     }
   }
 
-  // async function handleReject() {
+
+  // async function handleIssueCredit() {
   //   if (!selected) return;
+
+  //   const final = overridePrice
+  //     ? Number(overridePrice)
+  //     : Math.round((Number(percentage) / 100) * (selected.basePrice || 0));
 
   //   try {
   //     setLoading(true);
-  //     const res = await fetch("/api/update-tradein-request-status", {
-  //       method: "PUT",
+
+  //     const res = await fetch("/api/create-giftcard", {
+  //       method: "POST",
   //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify({ id: selected.id, status: "rejected" }),
+  //       body: JSON.stringify({
+  //         id: selected.id,
+  //         amount: final,
+  //         message: `Your trade-in credit of PKR ${final} has been issued.`
+  //       }),
   //     });
+
   //     const data = await res.json();
 
   //     if (data.success) {
-  //       setStatus(selected.id, "rejected");
-  //       toast.error("Request Rejected Successfully");
+  //       // update UI local state
+  //       setStatus(selected.id, "approved", final);
+
+  //       // If backend returned a code (rare), show it — otherwise show amount + email info
+  //       const returnedCode = data.data?.shopifyPayload?.giftCardCode || data.data?.payback?.approvedCode;
+  //       if (returnedCode) {
+  //         toast.success(`Approved — Gift card code ${returnedCode} sent to ${selected.email}`);
+  //       } else {
+  //         toast.success(`Approved — Gift card of PKR ${final} sent to ${selected.email}`);
+  //       }
+
   //       closeModal();
   //     } else {
-  //       toast.error("Failed to reject request");
+  //       toast.error("Failed to create gift card: " + (data.message || "unknown"));
   //     }
   //   } catch (err) {
-  //     console.error(err);
-  //     toast.error("Server error while rejecting request");
+  //     console.error("Issue credit error:", err);
+  //     toast.error("Server error while issuing gift card");
   //   } finally {
   //     setLoading(false);
   //   }
-
-
   // }
 
 
-  function handleIssueCredit() {
+  // small counts
+
+  async function handleIssueCredit() {
     if (!selected) return;
-    const final = overridePrice ? Number(overridePrice) : Math.round((Number(percentage) / 100) * (selected.basePrice || 0));
-    setStatus(selected.id, "approved", final);
-    toast.success(`issued credit: ${formatPrice(final)} to ${selected.customer}`);
-    closeModal();
+
+    const final = overridePrice
+      ? Number(overridePrice)
+      : Math.round((Number(percentage) / 100) * (selected.basePrice || 0));
+
+    try {
+      setLoading(true);
+
+      const res = await fetch("/api/create-giftcard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: selected.id,
+          amount: final,
+          message: `Your trade-in credit of PKR ${final} has been issued. Thank you for using Second Loop!`
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        // Update UI
+        setStatus(selected.id, "approved", final);
+
+        // Show success message
+        const code = data.data?.giftCardCode || data.data?.payback?.approvedCode;
+        if (code) {
+          toast.success(`✅ Gift card created! Code: ${code}`);
+        } else {
+          toast.success(`✅ Gift card of PKR ${final} created successfully!`);
+        }
+
+        closeModal();
+      } else {
+        toast.error(`❌ Failed: ${data.message || "Unknown error"}`);
+      }
+    } catch (err) {
+      console.error("Issue credit error:", err);
+      toast.error("Server error while issuing gift card");
+    } finally {
+      setLoading(false);
+    }
   }
 
-  // small counts
   const counts = {
     pending: requests.filter((r) => r.status === "pending").length,
     approved: requests.filter((r) => r.status === "approved").length,
@@ -439,7 +499,7 @@ export default function Tradein() {
                     </div>
 
                     <div>
-                      <small className="muted">override</small>
+                      {/* <small className="muted">override</small>
                       <div className="override">
                         <input
                           type="number"
@@ -450,7 +510,7 @@ export default function Tradein() {
                           disabled={!allowManual}
                         />
                         <span className="suffix">PKR</span>
-                      </div>
+                      </div> */}
 
                       {/* NEW: percentage input */}
                       <div style={{ marginTop: 8 }}>
@@ -474,12 +534,13 @@ export default function Tradein() {
                         </div>
                       </div>
 
-                      <label className="manual-row" style={{ marginTop: 8 }}>
+                      {/* <label className="manual-row" style={{ marginTop: 8 }}>
                         <input type="checkbox" checked={allowManual} onChange={(e) => setAllowManual(e.target.checked)} />
                         <span className="muted">allow manual override</span>
-                      </label>
+                      </label> */}
                     </div>
                   </div>
+
 
                   <div className="final">
                     <small className="muted">final</small>
@@ -489,7 +550,9 @@ export default function Tradein() {
                   </div>
 
                   <div className="modal-cta">
-                    <button className="btn" onClick={handleIssueCredit}>Issue Credit</button>
+                    <button className="btn" onClick={handleIssueCredit}>
+                      {loading ? "Issuing..." : "Issue Gift Card"}
+                    </button>
                     <button disabled={loading} className="btn primary" onClick={handleApprove}>{
                       loading ? "Approving..." : "Approve"
                     }</button>

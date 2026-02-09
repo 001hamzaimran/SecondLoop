@@ -27,6 +27,11 @@ const PaybackSchema = new mongoose.Schema(
       required: true,
     },
 
+    // Payback.Model.js
+    approvedGiftCardId: {
+      type: String,
+    },
+
     quantity: {
       type: Number,
     },
@@ -65,8 +70,14 @@ const PaybackSchema = new mongoose.Schema(
     },
 
     // OPTIONAL: persist shopify customer gid for faster future requests
+    customerId: {
+      type: String,
+      sparse: true
+    },
+
     shopifyCustomerId: {
       type: String,
+      sparse: true
     },
 
     approvedAt: {

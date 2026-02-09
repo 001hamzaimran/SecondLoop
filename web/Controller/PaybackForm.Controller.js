@@ -12,6 +12,7 @@ const createPaybackForm = async (req, res) => {
     const {
       name,
       email,
+      customer_id,
       order_id,
       product,
       product_id,
@@ -20,6 +21,28 @@ const createPaybackForm = async (req, res) => {
       condition,
       notes,
     } = req.body;
+
+    console.log('Customer ID received:', customer_id);
+
+    // Agar customer_id hai toh verify karo Shopify se
+    if (customer_id) {
+      const session = res.locals.shopify.session;
+      const client = new shopify.api.clients.Graphql({ session });
+
+      const customerData = await client.query({
+        data: `query {
+          customer(id: "${customer_id}") {
+            id
+            email
+            firstName
+            lastName
+          }
+        }`
+      });
+
+      // Customer verify ho gaya
+      console.log('Verified customer:', customerData.body.data.customer);
+    }
 
     // Basic validation
     if (!name || !email || !product || !base_price) {
@@ -66,6 +89,7 @@ const createPaybackForm = async (req, res) => {
       name,
       email,
       orderId: order_id,
+      shopifyCustomerId: customer_id,
       productName: product,
       productId: product_id,
       quantity: quantity ? Number(quantity) : undefined,
@@ -305,7 +329,7 @@ const updateStatusPaybackForm = async (req, res) => {
           payback.approvedPrice = options.percentage === 100
             ? payback.basePrice
             : (options.percentage / 100) * payback.basePrice;
-            payback.percentage = options.percentage;
+          payback.percentage = options.percentage;
           payback.approvedAt = new Date();
           payback.updatedAt = new Date();
 
