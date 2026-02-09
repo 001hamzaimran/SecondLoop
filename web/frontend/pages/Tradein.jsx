@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { toast } from "react-toastify"
+import { toast } from "react-toastify";
 import "./Tradein.css";
 
 export default function Tradein() {
@@ -8,6 +8,7 @@ export default function Tradein() {
 
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [rejLoading, setRejLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
 
@@ -18,8 +19,11 @@ export default function Tradein() {
   const [overridePrice, setOverridePrice] = useState("");
   const [allowManual, setAllowManual] = useState(true);
 
-  // NEW: percentage state (0-100). default 100 (full)
-  const [percentage, setPercentage] = useState(10);
+  console.log("selected", selected)
+
+
+  // NEW: approve action selector: "discount" or "giftcard"
+  const [approveAction, setApproveAction] = useState("discount");
 
   // derived list
   const filtered = useMemo(() => {
@@ -45,7 +49,7 @@ export default function Tradein() {
         return;
       }
 
-      // 👇 DB → UI mapping
+      // DB → UI mapping
       const formatted = data.data.map((item) => ({
         id: item._id,
         customer: item.name,
@@ -62,7 +66,9 @@ export default function Tradein() {
         description: item.description,
         percentage: item.percentage,
         approvedPrice: item.approvedPrice,
-        approvedCode: item.approvedCode
+        approvedCode: item.approvedCode,
+        shopifyCustomerId: item.shopifyCustomerId,
+        hasBox: item.hasBox
       }));
 
       setRequests(formatted);
@@ -93,15 +99,15 @@ export default function Tradein() {
     setSelectedImage(request.images && request.images[0]);
     setOverridePrice(""); // reset override each time
     setModalOpen(true);
-    setPercentage(request.percentage);
+    setApproveAction("discount"); // default selection when opening
   }
 
   function closeModal() {
     setModalOpen(false);
     setSelected(null);
     setSelectedImage(null);
-    setPercentage(10);
     setOverridePrice("");
+    setApproveAction("discount");
   }
 
   function setStatus(id, status, finalPrice = null) {
@@ -112,47 +118,24 @@ export default function Tradein() {
     );
   }
 
-  // function handleApprove() {
-  //   if (!selected) return;
-  //   const final = overridePrice ? Number(overridePrice) : computedPriceFor(selected);
-  //   setStatus(selected.id, "approved", final);
-  //   toast.success("Request Approved Successfully")
-  //   closeModal();
-  // }
-
   async function handleApprove() {
     if (!selected) return;
 
-    // const final = overridePrice ? Number(overridePrice) : computedPriceFor(selected);
-    const final = overridePrice ? Number(overridePrice) : Math.round((Number(percentage) / 100) * (selected.basePrice || 0));
+    const final = overridePrice ? Number(overridePrice) : (selected?.basePrice ?? 0);
+
 
     try {
       setLoading(true);
       const res = await fetch("/api/update-tradein-request-status", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: selected.id, status: "approved", approvedPrice: final, percentage: Number(percentage) }),
+        body: JSON.stringify({
+          id: selected.id, status: "approved", approvedPrice: final
+        }),
       });
       const data = await res.json();
 
-      //     if (data.success) {
-      //       toast.success(`Approved — code ${data.data.approvedCode} sent to ${selected.email}`);
-      //       setStatus(selected.id, "approved", final);
-      //       toast.success("Request Approved Successfully");
-      //       closeModal();
-      //     } else {
-      //       toast.error("Failed to approve request");
-      //     }
-      //   } catch (err) {
-      //     console.error(err);
-      //     toast.error("Server error while approving request");
-      //   } finally {
-      //     setLoading(false);
-      //   }
-      // }
-
       if (data.success) {
-        // server returns discountCode under data.data.discountCode or data.data.approvedCode depending on your backend
         const code = data.data?.discountCode || data.data?.approvedCode || "(code)";
         toast.success(`Approved — code ${code} sent to ${selected.email}`);
         setStatus(selected.id, "approved", final);
@@ -168,12 +151,11 @@ export default function Tradein() {
     }
   }
 
-
-
   async function handleReject() {
+    // NOTE: user asked to reduce to 2 buttons. I keep this function in case you want to re-add Reject later.
     if (!selected) return;
     try {
-      setLoading(true);
+      setRejLoading(true);
       const res = await fetch("/api/update-tradein-request-status", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -192,66 +174,15 @@ export default function Tradein() {
       console.error(err);
       toast.error("Server error while rejecting request");
     } finally {
-      setLoading(false);
+      setRejLoading(false);
     }
   }
-
-
-  // async function handleIssueCredit() {
-  //   if (!selected) return;
-
-  //   const final = overridePrice
-  //     ? Number(overridePrice)
-  //     : Math.round((Number(percentage) / 100) * (selected.basePrice || 0));
-
-  //   try {
-  //     setLoading(true);
-
-  //     const res = await fetch("/api/create-giftcard", {
-  //       method: "POST",
-  //       headers: { "Content-Type": "application/json" },
-  //       body: JSON.stringify({
-  //         id: selected.id,
-  //         amount: final,
-  //         message: `Your trade-in credit of PKR ${final} has been issued.`
-  //       }),
-  //     });
-
-  //     const data = await res.json();
-
-  //     if (data.success) {
-  //       // update UI local state
-  //       setStatus(selected.id, "approved", final);
-
-  //       // If backend returned a code (rare), show it — otherwise show amount + email info
-  //       const returnedCode = data.data?.shopifyPayload?.giftCardCode || data.data?.payback?.approvedCode;
-  //       if (returnedCode) {
-  //         toast.success(`Approved — Gift card code ${returnedCode} sent to ${selected.email}`);
-  //       } else {
-  //         toast.success(`Approved — Gift card of PKR ${final} sent to ${selected.email}`);
-  //       }
-
-  //       closeModal();
-  //     } else {
-  //       toast.error("Failed to create gift card: " + (data.message || "unknown"));
-  //     }
-  //   } catch (err) {
-  //     console.error("Issue credit error:", err);
-  //     toast.error("Server error while issuing gift card");
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // }
-
-
-  // small counts
 
   async function handleIssueCredit() {
     if (!selected) return;
 
-    const final = overridePrice
-      ? Number(overridePrice)
-      : Math.round((Number(percentage) / 100) * (selected.basePrice || 0));
+    const final = overridePrice ? Number(overridePrice) : (selected?.basePrice ?? 0);
+
 
     try {
       setLoading(true);
@@ -260,7 +191,7 @@ export default function Tradein() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: selected.id,
+          id: selected?.id,
           amount: final,
           message: `Your trade-in credit of PKR ${final} has been issued. Thank you for using Second Loop!`
         }),
@@ -292,13 +223,25 @@ export default function Tradein() {
     }
   }
 
+  // new helper: contextual approve action
+  async function handleApproveOrAction() {
+    // If admin selected "giftcard" in dropdown, call the giftcard function
+    if (approveAction === "giftcard") {
+      await handleIssueCredit();
+    } else {
+      // default -> discount code flow
+      await handleApprove();
+    }
+  }
+
   const counts = {
     pending: requests.filter((r) => r.status === "pending").length,
     approved: requests.filter((r) => r.status === "approved").length,
     rejected: requests.filter((r) => r.status === "rejected").length,
   };
 
-  const displayFinal = (selected ? (overridePrice ? Number(overridePrice) : Math.round((Number(percentage) / 100) * (selected.basePrice || 0))) : 0);
+  const displayFinal = selected ? (overridePrice ? Number(overridePrice) : (selected?.basePrice ?? 0)) : 0;
+
 
   return (
     <div className="ti-page">
@@ -398,7 +341,6 @@ export default function Tradein() {
 
                   <td>
                     <div className="price-col">
-                      {/* <div className="computed">{formatPrice(cp)}</div> */}
                       <div className="computed">{r?.basePrice}</div>
                       <div className="small muted">rule</div>
                     </div>
@@ -436,14 +378,12 @@ export default function Tradein() {
           <div className="ti-modal-panel" role="dialog" aria-modal="true" aria-label="request detail">
             <div className="modal-head">
               <div>
-                <h2>Request {selected.id}</h2>
                 <div className="muted">{selected.customer} • {selected.email}</div>
               </div>
 
               <div className="modal-actions">
                 <button className="btn ghost" onClick={closeModal}>Close</button>
-                <button className="btn primary" onClick={handleApprove}>{loading ? "Approving..." : "Approve"}</button>
-                <button className="btn danger" onClick={handleReject}>{loading ? "Rejecting..." : "Reject"}</button>
+                {/* Removed the old Approve/Reject from head to keep UI simple */}
               </div>
             </div>
 
@@ -493,70 +433,85 @@ export default function Tradein() {
                 <div className="price-box">
                   <div className="price-row">
                     <div>
-                      <small className="muted">rule price</small>
-                      {/* <div className="rule-price">{formatPrice(computedPriceFor(selected))}</div> */}
-                      <div className="rule-price">{selected?.basePrice}</div>
+                      <small className="muted">Box</small>
+                      <div className="rule-price">
+                        {selected?.hasBox
+                          ? <span className="chip success">Has box</span>
+                          : <span className="chip muted">No box</span>
+                        }
+                      </div>
                     </div>
 
                     <div>
-                      {/* <small className="muted">override</small>
-                      <div className="override">
-                        <input
-                          type="number"
-                          className="override-input"
-                          placeholder={`${computedPriceFor(selected)}`}
-                          value={overridePrice}
-                          onChange={(e) => setOverridePrice(e.target.value)}
-                          disabled={!allowManual}
-                        />
-                        <span className="suffix">PKR</span>
-                      </div> */}
-
-                      {/* NEW: percentage input */}
                       <div style={{ marginTop: 8 }}>
-                        <small className="muted">percentage (0-100)</small>
+                        <small className="muted">Amount (PKR)</small>
                         <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
                           <input
                             type="number"
                             min="0"
-                            max="100"
-                            value={percentage}
+                            step="0.01"
+                            placeholder="0"
+                            value={overridePrice}
                             onChange={(e) => {
-                              let v = Number(e.target.value);
-                              if (Number.isNaN(v)) v = 0;
-                              if (v > 100) v = 100;
-                              if (v < 0) v = 0;
-                              setPercentage(v);
+                              // allow empty, otherwise numeric
+                              const v = e.target.value;
+                              if (v === "") return setOverridePrice("");
+                              // sanitize to number string
+                              const n = Number(v);
+                              if (Number.isNaN(n)) return;
+                              setOverridePrice(String(n));
                             }}
-                            style={{ width: 90, padding: "6px 8px", borderRadius: 6 }}
+                            style={{ width: 140, padding: "6px 8px", borderRadius: 6 }}
                           />
-                          <span className="muted">%</span>
+                          <span className="muted">PKR</span>
+                        </div>
+                        <div style={{ fontSize: 12, color: "#666", marginTop: 6 }}>
+                          Enter the exact amount to issue.
                         </div>
                       </div>
-
-                      {/* <label className="manual-row" style={{ marginTop: 8 }}>
-                        <input type="checkbox" checked={allowManual} onChange={(e) => setAllowManual(e.target.checked)} />
-                        <span className="muted">allow manual override</span>
-                      </label> */}
                     </div>
-                  </div>
 
+                  </div>
 
                   <div className="final">
                     <small className="muted">final</small>
-                    {/* <div className="final-price">{formatPrice(overridePrice ? Number(overridePrice) : computedPriceFor(selected))}</div> */}
-                    {/* <div className="final-price">PKR: {selected?.basePrice}</div> */}
-                    <div className="final-price">PKR: {displayFinal}</div>
+                    <div className="final-price">
+                      {formatPrice(displayFinal ? displayFinal : selected?.basePrice ?? 0)}
+                    </div>
                   </div>
 
-                  <div className="modal-cta">
-                    <button className="btn" onClick={handleIssueCredit}>
-                      {loading ? "Issuing..." : "Issue Gift Card"}
+                  <div className="modal-cta" style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+                    {/* Dropdown to pick action for Approve button */}
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      <small className="muted">On Approve</small>
+                      <select
+                        value={approveAction}
+                        onChange={(e) => setApproveAction(e.target.value)}
+                        style={{ padding: "6px 8px", borderRadius: 6 }}
+                        disabled={loading}
+                      >
+                        <option value="discount">Create Discount Code</option>
+                        <option value="giftcard">Issue Gift Card</option>
+                      </select>
+                    </div>
+
+                    {/* Approve button: will run discount or giftcard depending on dropdown */}
+                    <button
+                      className="btn primary"
+                      onClick={handleApproveOrAction}
+                      disabled={loading}
+                    >
+                      {loading ? (approveAction === "giftcard" ? "Issuing Gift Card..." : "Creating Discount...") : "Approve"}
                     </button>
-                    <button disabled={loading} className="btn primary" onClick={handleApprove}>{
-                      loading ? "Approving..." : "Approve"
-                    }</button>
-                    <button className="btn danger" onClick={handleReject}>{loading ? "Rejecting..." : "Reject"}</button>
+
+                    {/* Reject button */}
+                    <button
+                      className="btn danger"
+                      onClick={handleReject}
+                      disabled={rejLoading}
+                    >
+                      {rejLoading ? "Rejecting..." : "Reject"}
+                    </button>
                   </div>
                 </div>
 

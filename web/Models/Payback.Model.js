@@ -36,9 +36,9 @@ const PaybackSchema = new mongoose.Schema(
       type: Number,
     },
 
-    basePrice: {
-      type: Number,
-      required: true,
+    hasBox: {
+      type: Boolean,
+      default: false,
     },
 
     condition: {
@@ -52,6 +52,10 @@ const PaybackSchema = new mongoose.Schema(
       type: String,
       default: "pending",
       enum: ["pending", "approved", "rejected"]
+    },
+
+    giftCardCode: {
+      type: String,
     },
 
     approvedCode: {

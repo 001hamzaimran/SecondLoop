@@ -2,6 +2,7 @@
 console.log("Second Loop extension script loaded");
 
 (function () {
+    console.log("Second Loop extension script executing", window.currentShopifyCustomer.id);
     const openBtn = document.getElementById("second-loop-button");
     const modal = document.getElementById("second-loop-modal");
     const closeBtn = document.getElementById("second-loop-close");
@@ -13,6 +14,7 @@ console.log("Second Loop extension script loaded");
     const previews = document.getElementById("sl-image-previews");
     const formMessage = document.getElementById("sl-form-message");
     const selectedProductBox = document.getElementById("sl-selected-product");
+    const hasBoxCheckbox = document.getElementById("sl-has-box");
 
     // ---------- NEW: product elements ----------
     const productInput = document.getElementById("sl-product");
@@ -108,6 +110,14 @@ console.log("Second Loop extension script loaded");
         updatePreviews();
     });
 
+    // generate a stable-ish unique id for local product
+    function generateLocalProductId(title) {
+        const slug = (title || "product").toString().trim().toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+        const rand = Math.random().toString(36).slice(2, 8);
+        return `local-${Date.now()}-${rand}-${slug}`.slice(0, 120); // limit length
+    }
+
     // ===== VALIDATION =====
     function clearErrors() {
         ["err-name", "err-email", "err-product", "err-condition", "err-images"].forEach(id => {
@@ -144,37 +154,46 @@ console.log("Second Loop extension script loaded");
         return ok;
     }
 
-// Customer get karne ka function - SIMPLIFIED
-async function getShopifyCustomer() {
-  // Method 1: Liquid se (Sabse reliable)
-  if (window.currentShopifyCustomer) {
-    console.log('Found customer via Liquid:', window.currentShopifyCustomer);
-    return window.currentShopifyCustomer;
-  }
-  
-  // Method 2: Shopify global object
-  if (typeof Shopify !== 'undefined' && Shopify.customer) {
-    console.log('Found customer via Shopify global:', Shopify.customer);
-    return Shopify.customer;
-  }
-  
-  // Method 3: Check account page (fallback)
-  try {
-    const response = await fetch('/account', { 
-      method: 'GET',
-      credentials: 'same-origin'
-    });
-    if (response.ok) {
-      console.log('Customer is logged in (account page accessible)');
-      return { loggedIn: true };
+    // Customer get karne ka function - SIMPLIFIED
+    async function getShopifyCustomer() {
+        // Method 1: Liquid se (Sabse reliable)
+        if (window.currentShopifyCustomer) {
+            document.getElementById("customer_id_input").value =
+                window.currentShopifyCustomer.id;
+
+            // document.getElementById("sl-name").value =
+            //     window.currentShopifyCustomer.name || "";
+
+            // document.getElementById("sl-email").value =
+            //     window.currentShopifyCustomer.email || "";
+
+            return window.currentShopifyCustomer; // 🔥 ADD THIS
+        }
+
+        // Method 2: Shopify global object
+        if (typeof Shopify !== 'undefined' && Shopify.customer) {
+            console.log('Found customer via Shopify global:', Shopify.customer);
+            return Shopify.customer;
+        }
+
+        // Method 3: Check account page (fallback)
+        try {
+            const response = await fetch('/account', {
+                method: 'GET',
+                credentials: 'same-origin'
+            });
+            if (response.ok) {
+                console.log('Customer is logged in (account page accessible)');
+                return { loggedIn: true };
+            }
+        } catch (error) {
+            // Ignore error
+        }
+
+        console.log('No customer found - guest user');
+        return null;
     }
-  } catch (error) {
-    // Ignore error
-  }
-  
-  console.log('No customer found - guest user');
-  return null;
-}
+
 
 
 
@@ -218,7 +237,7 @@ async function getShopifyCustomer() {
         fd.append("quantity", document.getElementById("sl-quantity").value);
         fd.append("condition", document.getElementById("sl-condition").value);
         fd.append("notes", document.getElementById("sl-notes").value.trim());
-        fd.append("base_price", document.getElementById("sl-base-price").value);
+        // fd.append("base_price", document.getElementById("sl-base-price").value);
 
         // ✅ CUSTOMER ID ADD KARO
         if (customerId) {
@@ -233,7 +252,9 @@ async function getShopifyCustomer() {
         // append all images
         currentFiles.forEach(file => fd.append("images", file, file.name));
 
-        console.log("Form submitting with customer_id:", customerId);
+        // append has_box boolean
+        const hasBox = hasBoxCheckbox && hasBoxCheckbox.checked;
+        fd.append("has_box", hasBox ? "true" : "false");
 
         // 3. BACKEND KO SEND KARO
         const endpoint = "/apps/secondloop/payback-form";
@@ -385,8 +406,26 @@ async function getShopifyCustomer() {
         info.appendChild(title);
         info.appendChild(vendor);
 
+        // create remove button (cross)
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "sl-remove-product";
+        removeBtn.title = "Remove selected product";
+        removeBtn.innerHTML = "&times;"; // ×
+        removeBtn.addEventListener("click", () => {
+            // clear UI
+            selectedProductBox.innerHTML = "";
+            // clear input + hidden id
+            productInput.value = "";
+            if (productIdHidden) productIdHidden.value = "";
+            // optional: re-focus to product input
+            productInput.focus();
+        });
+
+
         card.appendChild(img);
         card.appendChild(info);
+        card.appendChild(removeBtn);
 
         selectedProductBox.appendChild(card);
     }
@@ -420,15 +459,71 @@ async function getShopifyCustomer() {
             tryAutoSelectByTitle(q);
         });
 
-        // on blur hide suggestions (allow click by small delay)
         productInput.addEventListener("blur", () => {
             setTimeout(() => {
                 if (suggestionsContainer) {
                     suggestionsContainer.innerHTML = "";
                     suggestionsContainer.style.display = "none";
                 }
+
+                // if user typed something and no productId set -> create a local id
+                const title = (productInput.value || "").trim();
+                if (title && productIdHidden && !productIdHidden.value) {
+                    // generate a local id and show mini selected card
+                    const localId = generateLocalProductId(title);
+                    productIdHidden.value = localId;
+
+                    // show selected box similar to selectProduct but for a local product
+                    selectedProductBox.innerHTML = "";
+
+                    const card = document.createElement("div");
+                    card.className = "sl-selected-card";
+
+                    const placeholder = document.createElement("div");
+                    placeholder.className = "sl-selected-placeholder";
+                    placeholder.textContent = title[0]?.toUpperCase() || "P";
+                    placeholder.style.width = "48px";
+                    placeholder.style.height = "48px";
+                    placeholder.style.display = "flex";
+                    placeholder.style.alignItems = "center";
+                    placeholder.style.justifyContent = "center";
+                    placeholder.style.borderRadius = "6px";
+                    placeholder.style.background = "#f4f4f4";
+                    placeholder.style.fontWeight = "600";
+
+                    const info = document.createElement("div");
+                    info.className = "sl-selected-info";
+                    const titleEl = document.createElement("div");
+                    titleEl.textContent = title;
+                    const tag = document.createElement("small");
+                    tag.textContent = "Local product (not in Shopify)";
+                    tag.className = "muted";
+
+                    info.appendChild(titleEl);
+                    info.appendChild(tag);
+
+                    // remove button
+                    const removeBtn = document.createElement("button");
+                    removeBtn.type = "button";
+                    removeBtn.className = "sl-remove-product";
+                    removeBtn.title = "Remove selected product";
+                    removeBtn.innerHTML = "&times;";
+                    removeBtn.addEventListener("click", () => {
+                        selectedProductBox.innerHTML = "";
+                        productInput.value = "";
+                        productIdHidden.value = "";
+                        productInput.focus();
+                    });
+
+                    card.appendChild(placeholder);
+                    card.appendChild(info);
+                    card.appendChild(removeBtn);
+
+                    selectedProductBox.appendChild(card);
+                }
             }, 200);
         });
+
     }
 
 })();

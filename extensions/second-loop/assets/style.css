@@ -125,7 +125,6 @@
   margin-bottom: 18px;
   display: block;
 }
-
 .sl-label {
   font-weight: 600;
   font-size: 14px;
@@ -273,6 +272,37 @@
   object-fit: cover;
   border-radius: 8px;
 }
+
+.sl-selected-card {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #eee;
+  border-radius: 6px;
+}
+
+.sl-selected-card img {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.sl-selected-info {
+  flex: 1;
+}
+
+.sl-remove-product {
+  background: transparent;
+  border: 0;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 6px;
+  color: #d00;
+}
+
 
 .sl-selected-info {
   display: flex;

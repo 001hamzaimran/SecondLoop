@@ -58,14 +58,6 @@
           <input type="text" name="order_id" id="sl-order-id">
         </label>
 
-        {% comment %}
-          <label class="sl-field">
-            <span class="sl-label">Product Name *</span>
-            <input type="text" name="product" id="sl-product" required />
-            <div class="sl-error" id="err-product"></div>
-          </label>
-        {% endcomment %}
-
         <label class="sl-field">
           <span class="sl-label">Product Name *</span>
 
@@ -81,11 +73,13 @@
           <input type="hidden" name="product_id" id="sl-product-id">
         </label>
 
-        <label class="sl-field">
-          <span class="sl-label">Base Price *</span>
-          <input type="number" name="base_price" id="sl-base-price" min="0" required>
-          <div class="sl-error" id="err-base-price"></div>
-        </label>
+        {% comment %}
+          <label class="sl-field">
+            <span class="sl-label">Base Price *</span>
+            <input type="number" name="base_price" id="sl-base-price" min="0" required>
+            <div class="sl-error" id="err-base-price"></div>
+          </label>
+        {% endcomment %}
 
         <label class="sl-field">
           <span class="sl-label">Quantity (optional)</span>
@@ -112,6 +106,11 @@
           <div class="sl-hint">You can upload up to 8 images (jpg, png).</div>
           <div class="sl-error" id="err-images"></div>
           <div id="sl-image-previews" class="sl-previews" aria-live="polite"></div>
+        </label>
+
+        <label class="sl-field">
+          <input type="checkbox" id="sl-has-box" name="has_box" value="true">
+          <span class="sl-label-inline">I still have the original product box</span>
         </label>
 
         <label class="sl-field">

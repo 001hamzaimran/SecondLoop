@@ -24,28 +24,9 @@ const createPaybackForm = async (req, res) => {
 
     console.log('Customer ID received:', customer_id);
 
-    // Agar customer_id hai toh verify karo Shopify se
-    if (customer_id) {
-      const session = res.locals.shopify.session;
-      const client = new shopify.api.clients.Graphql({ session });
-
-      const customerData = await client.query({
-        data: `query {
-          customer(id: "${customer_id}") {
-            id
-            email
-            firstName
-            lastName
-          }
-        }`
-      });
-
-      // Customer verify ho gaya
-      console.log('Verified customer:', customerData.body.data.customer);
-    }
 
     // Basic validation
-    if (!name || !email || !product || !base_price) {
+    if (!name || !email || !product) {
       return res.status(400).json({ success: false, message: "Required fields are missing" });
     }
 
@@ -83,6 +64,8 @@ const createPaybackForm = async (req, res) => {
     });
 
     const imageUrls = uploadedImageUrls.map(u => u.url);
+    const hasBox = (req.body.has_box === "true" || req.body.has_box === true);
+
 
     // Create payback entry
     const payback = await PaybackModel.create({
@@ -97,6 +80,7 @@ const createPaybackForm = async (req, res) => {
       condition: condition?.toLowerCase() || "good",
       images: imageUrls,
       description: notes,
+      hasBox: hasBox,
     });
 
     return res.status(201).json({
@@ -138,98 +122,20 @@ const getDataPaybackForm = async (req, res) => {
   }
 }
 
-// ============================== working code ==================
-
-// const updateStatusPaybackForm = async (req, res) => {
-//   try {
-//     const { id, status } = req.body;
-
-//     // Validate status
-//     if (!["pending", "approved", "rejected"].includes(status)) {
-//       return res.status(400).json({ success: false, message: "Invalid status" });
-//     }
-
-//     const payback = await PaybackModel.findById(id);
-//     if (!payback) {
-//       return res.status(404).json({ success: false, message: "Payback not found" });
-//     }
-
-//     // if already same status, just return
-//     if (payback.status === status) {
-//       return res.status(200).json({ success: true, message: "No change needed", data: payback });
-//     }
-
-//     // Update status field
-//     payback.status = status;
-
-//     if (status === "approved") {
-//       // Prepare options: you can set percentage rule and minPrice here or based on other DB config
-//       const options = {
-//         percentage: 100, // or pick from config/threshold
-//         minPrice: payback.basePrice || 0,
-//         usageLimit: 1,
-//         endDays: 14
-//       };
-
-//       // Use shopify session provided by middleware (validateAuthenticatedSession sets it)
-//       const session = res.locals?.shopify?.session;
-//       try {
-//         const result = await createShopifyCodeForCustomer(session, payback, options);
-//         if (result?.success) {
-//           const code = result.code;
-//           payback.approvedCode = code;
-//           payback.approvedPrice = options.percentage === 100 ? payback.basePrice : options.percentage/100 * payback.basePrice;
-//           payback.approvedAt = new Date();
-
-//           // send email
-//           try {
-//             await sendDiscountEmail({
-//               to: payback.email,
-//               code,
-//               amount: payback.approvedPrice,
-//               productName: payback.productName
-//             });
-//           } catch (emailErr) {
-//             console.error("Email send failed:", emailErr);
-//             // don't fail the whole process for email failure — but include the note
-//           }
-//         } else {
-//           // if shopify failed, you may decide to rollback status -> pending. For now we will keep status=approved
-//           console.warn("Shopify code creation did not succeed:", result);
-//         }
-//       } catch (err) {
-//         console.error("Shopify discount creation error:", err);
-//         // You can choose to rollback status or set a flag on payback; here we'll set an error field:
-//         payback.approvedCode = null;
-//       }
-//     }
-
-//     await payback.save();
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Status updated successfully",
-//       data: payback,
-//     });
-//   } catch (error) {
-//     console.error("Update status error:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Internal Server Error",
-//       error: error.message
-//     });
-//   }
-// };
-
-// ====================testing
-
 const updateStatusPaybackForm = async (req, res) => {
   try {
     console.log("=== UPDATE PAYBACK STATUS REQUEST ===");
     console.log("Request Body:", req.body);
     console.log("Session:", res.locals?.shopify?.session?.shop);
 
-    const { id, status, approvedPrice: approvedPriceFromReq, percentage: percentageFromReq } = req.body;
+    const { id, status, approvedPrice: approvedPriceFromReq } = req.body;
+
+    if (approvedPriceFromReq === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "approvedPrice is required for approval"
+      });
+    }
 
     // Validate status
     if (!["pending", "approved", "rejected"].includes(status)) {
@@ -270,38 +176,21 @@ const updateStatusPaybackForm = async (req, res) => {
       // =================== APPROVED FLOW ===================
       console.log("Starting approval process...");
 
-      // Prepare discount options
-      // const options = {
-      //   percentage: 100,
-      //   minPrice: payback.basePrice || 0,
-      //   usageLimit: 1,
-      //   endDays: 14
-      // };
+      let finalPrice = Number(approvedPriceFromReq);
 
-      // Determine percentage (0-100). If frontend provided percentage use it, otherwise default 100.
-      const percentage = Number(percentageFromReq ?? 100);
-      if (Number.isNaN(percentage) || percentage < 0 || percentage > 100) {
-        return res.status(400).json({ success: false, message: "percentage must be a number between 0 and 100" });
-      }
-
-      // Determine final approvedPrice:
-      let finalPrice;
-      if (approvedPriceFromReq !== undefined && approvedPriceFromReq !== null && approvedPriceFromReq !== "") {
-        finalPrice = Number(approvedPriceFromReq);
-        if (Number.isNaN(finalPrice) || finalPrice < 0) {
-          return res.status(400).json({ success: false, message: "approvedPrice must be a valid number" });
-        }
-      } else {
-        // compute from percentage
-        finalPrice = Math.round((percentage / 100) * (payback.basePrice || 0));
+      if (Number.isNaN(finalPrice) || finalPrice < 0) {
+        return res.status(400).json({
+          success: false,
+          message: "approvedPrice must be a valid number"
+        });
       }
 
       // Build options for discount creation
       const options = {
-        percentage: percentage,
+        amount: finalPrice,
         minPrice: 1, // optionally you can set floor here
         usageLimit: 1,
-        endDays: 14
+        endDays: 60
       };
 
       // Get Shopify session
@@ -326,9 +215,7 @@ const updateStatusPaybackForm = async (req, res) => {
           // Update payback with approved data
           payback.status = "approved";
           payback.approvedCode = code;
-          payback.approvedPrice = options.percentage === 100
-            ? payback.basePrice
-            : (options.percentage / 100) * payback.basePrice;
+          payback.approvedPrice = finalPrice;
           payback.approvedAt = new Date();
           payback.updatedAt = new Date();
 

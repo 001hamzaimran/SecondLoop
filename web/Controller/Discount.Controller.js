@@ -24,7 +24,7 @@ export async function createShopifyCodeForCustomer(session, payback, options = {
       percentage = 100,
       minPrice = 1,
       usageLimit = 1,
-      endDays = 30,
+      endDays = 60,
     } = options;
 
     const endsAtDate = new Date();
