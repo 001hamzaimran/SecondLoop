@@ -298,7 +298,7 @@ const updateStatusPaybackForm = async (req, res) => {
 
       // Build options for discount creation
       const options = {
-        percentage: percentageFromReq,
+        percentage: percentage,
         minPrice: 1, // optionally you can set floor here
         usageLimit: 1,
         endDays: 14
@@ -329,7 +329,6 @@ const updateStatusPaybackForm = async (req, res) => {
           payback.approvedPrice = options.percentage === 100
             ? payback.basePrice
             : (options.percentage / 100) * payback.basePrice;
-          payback.percentage = options.percentage;
           payback.approvedAt = new Date();
           payback.updatedAt = new Date();
 
