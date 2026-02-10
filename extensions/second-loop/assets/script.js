@@ -1,8 +1,9 @@
-
 console.log("Second Loop extension script loaded");
 
 (function () {
-    console.log("Second Loop extension script executing", window.currentShopifyCustomer.id);
+    // safe guard: if Liquid didn't inject currentShopifyCustomer, access may fail in console.log
+    try { console.log("Second Loop extension script executing", window.currentShopifyCustomer && window.currentShopifyCustomer.id); } catch (e) {}
+
     const openBtn = document.getElementById("second-loop-button");
     const modal = document.getElementById("second-loop-modal");
     const closeBtn = document.getElementById("second-loop-close");
@@ -27,10 +28,14 @@ console.log("Second Loop extension script loaded");
     let allProducts = []; // will hold products from backend
     let suggestionTimeout = null;
     let productsLoaded = false;
+    let selectedProducts = [];
 
     function showModal() {
         modal.setAttribute("aria-hidden", "false");
-        setTimeout(() => document.getElementById("sl-name").focus(), 10);
+        setTimeout(() => {
+            const nameEl = document.getElementById("sl-name");
+            if (nameEl) nameEl.focus();
+        }, 10);
         document.addEventListener("keydown", onKeyDown);
 
         // 🔥 load products when modal opens
@@ -49,6 +54,10 @@ console.log("Second Loop extension script loaded");
         // clear product suggestions and hidden id on close
         if (suggestionsContainer) suggestionsContainer.innerHTML = "";
         if (productIdHidden) productIdHidden.value = "";
+
+        // clear selected products UI & state (optional: keep if you want)
+        selectedProducts = [];
+        renderSelectedProducts();
     }
 
     function onKeyDown(e) {
@@ -62,10 +71,12 @@ console.log("Second Loop extension script loaded");
 
     // ===== IMAGE PREVIEWS =====
     function clearPreviews() {
+        if (!previews) return;
         previews.innerHTML = "";
     }
 
     function updatePreviews() {
+        if (!previews) return;
         clearPreviews();
         currentFiles.forEach((file, idx) => {
             const reader = new FileReader();
@@ -92,6 +103,62 @@ console.log("Second Loop extension script loaded");
         currentFiles.forEach(f => dt.items.add(f));
         imageInput.files = dt.files;
     }
+
+    function renderSelectedProducts() {
+        if (!selectedProductBox) return;
+        selectedProductBox.innerHTML = "";
+
+        selectedProducts.forEach(p => {
+            const card = document.createElement("div");
+            card.className = "sl-selected-card multi";
+
+            // thumbnail (image or placeholder)
+            const thumb = document.createElement("div");
+            thumb.className = "sl-selected-thumb";
+            if (p.imageUrl) {
+                const img = document.createElement("img");
+                img.src = p.imageUrl;
+                img.alt = p.title || "";
+                thumb.appendChild(img);
+            } else {
+                const placeholder = document.createElement("div");
+                placeholder.className = "sl-selected-placeholder";
+                placeholder.textContent = (p.title || "P")[0].toUpperCase();
+                thumb.appendChild(placeholder);
+            }
+            card.appendChild(thumb);
+
+            // info
+            const info = document.createElement("div");
+            info.className = "sl-selected-info";
+            const title = document.createElement("div");
+            title.textContent = p.title || "";
+            const vendor = document.createElement("small");
+            vendor.textContent = p.vendor || "";
+            info.appendChild(title);
+            info.appendChild(vendor);
+            card.appendChild(info);
+
+            // remove button
+            const removeBtn = document.createElement("button");
+            removeBtn.type = "button";
+            removeBtn.className = "sl-remove-product";
+            removeBtn.title = "Remove";
+            removeBtn.innerHTML = "&times;";
+            removeBtn.addEventListener("click", () => {
+                // remove from selectedProducts by id
+                selectedProducts = selectedProducts.filter(sp => sp.id !== p.id);
+                renderSelectedProducts();
+            });
+            card.appendChild(removeBtn);
+
+            selectedProductBox.appendChild(card);
+        });
+
+        // Update native hidden input if you still want single-value fallback (optional)
+        // You can keep the original single hidden input untouched; we will send multiple IDs on submit.
+    }
+
 
     function removeFileAtIndex(index) {
         currentFiles.splice(index, 1);
@@ -134,10 +201,10 @@ console.log("Second Loop extension script loaded");
     function validateForm() {
         clearErrors();
         let ok = true;
-        const name = document.getElementById("sl-name").value.trim();
-        const email = document.getElementById("sl-email").value.trim();
-        const product = document.getElementById("sl-product").value.trim();
-        const condition = document.getElementById("sl-condition").value;
+        const name = (document.getElementById("sl-name")?.value || "").trim();
+        const email = (document.getElementById("sl-email")?.value || "").trim();
+        // const product = (document.getElementById("sl-product")?.value || "").trim();
+        const condition = document.getElementById("sl-condition")?.value;
 
         if (!name) { showError("err-name", "name is required"); ok = false; }
         if (!email) {
@@ -146,10 +213,16 @@ console.log("Second Loop extension script loaded");
             const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!re.test(email)) { showError("err-email", "enter a valid email"); ok = false; }
         }
-        if (!product) { showError("err-product", "product name is required"); ok = false; }
+        // product field itself is optional because we allow selectedProducts
         if (!condition) { showError("err-condition", "please select condition"); ok = false; }
         if (currentFiles.length < 3) { showError("err-images", "please upload at least 3 image"); ok = false; }
         if (currentFiles.length > 8) { showError("err-images", "maximum 8 images allowed"); ok = false; }
+
+        // require at least one selected product
+        if (selectedProducts.length === 0 && !(productIdHidden && productIdHidden.value)) {
+            showError("err-product", "please select at least one product");
+            ok = false;
+        }
 
         return ok;
     }
@@ -158,14 +231,14 @@ console.log("Second Loop extension script loaded");
     async function getShopifyCustomer() {
         // Method 1: Liquid se (Sabse reliable)
         if (window.currentShopifyCustomer) {
-            document.getElementById("customer_id_input").value =
-                window.currentShopifyCustomer.id;
+            const cidInput = document.getElementById("customer_id_input");
+            if (cidInput) cidInput.value = window.currentShopifyCustomer.id;
 
-            // document.getElementById("sl-name").value =
-            //     window.currentShopifyCustomer.name || "";
-
-            // document.getElementById("sl-email").value =
-            //     window.currentShopifyCustomer.email || "";
+            // Auto-fill name/email only if empty
+            const nameEl = document.getElementById("sl-name");
+            const emailEl = document.getElementById("sl-email");
+            if (nameEl && !nameEl.value.trim() && window.currentShopifyCustomer.name) nameEl.value = window.currentShopifyCustomer.name;
+            if (emailEl && !emailEl.value.trim() && window.currentShopifyCustomer.email) emailEl.value = window.currentShopifyCustomer.email;
 
             return window.currentShopifyCustomer; // 🔥 ADD THIS
         }
@@ -194,8 +267,59 @@ console.log("Second Loop extension script loaded");
         return null;
     }
 
+    // === NEW HELPERS (for Enter key & adding local product) ===
+    function addLocalProductFromInput() {
+        if (!productInput) return;
+        const title = (productInput.value || "").trim();
+        if (!title) return;
 
+        // generate id & avoid duplicates by title or id
+        const localId = generateLocalProductId(title);
+        const already = selectedProducts.some(sp => sp.id === localId || (sp.title || "").toLowerCase() === title.toLowerCase());
+        if (already) {
+            productInput.value = "";
+            return;
+        }
 
+        selectedProducts.push({
+            id: localId,
+            title,
+            vendor: "Local product (not in Shopify)",
+            imageUrl: null,
+            local: true
+        });
+
+        renderSelectedProducts();
+        productInput.value = "";
+        if (productIdHidden) productIdHidden.value = ""; // don't set single hidden for multi-select
+    }
+
+    // handle Enter key: select typed product immediately
+    if (productInput) {
+        productInput.addEventListener("keydown", async (e) => {
+            // if suggestions are visible and arrow/enter handling might be different,
+            // we keep it simple: Enter selects typed value as local product (unless matched to a real product)
+            if (e.key === "Enter") {
+                e.preventDefault();
+
+                // try to match exact product title first (case-insensitive)
+                await loadProductsOnce();
+                const typed = (productInput.value || "").trim();
+                if (!typed) return;
+
+                const match = allProducts.find(p => (p.title || "").toLowerCase() === typed.toLowerCase());
+                if (match) {
+                    // if exact shopify product match, select it (same as click)
+                    selectProduct(match);
+                    productInput.value = "";
+                    return;
+                }
+
+                // otherwise add as local product
+                addLocalProductFromInput();
+            }
+        });
+    }
 
     // ===== SUBMIT HANDLER =====
     form.addEventListener("submit", async (e) => {
@@ -212,17 +336,6 @@ console.log("Second Loop extension script loaded");
             const customer = await getShopifyCustomer();
             if (customer && customer.id) {
                 customerId = customer.id;
-
-                // Auto-fill name and email if empty
-                const nameField = document.getElementById('sl-name');
-                const emailField = document.getElementById('sl-email');
-
-                if (nameField && !nameField.value.trim() && customer.name) {
-                    nameField.value = customer.name;
-                }
-                if (emailField && !emailField.value.trim() && customer.email) {
-                    emailField.value = customer.email;
-                }
             }
         } catch (err) {
             console.log('Customer fetch skipped:', err);
@@ -230,13 +343,14 @@ console.log("Second Loop extension script loaded");
 
         // 2. FORM DATA BANAO (customer_id ke saath)
         const fd = new FormData();
-        fd.append("name", document.getElementById("sl-name").value.trim());
-        fd.append("email", document.getElementById("sl-email").value.trim());
-        fd.append("order_id", document.getElementById("sl-order-id").value.trim());
-        fd.append("product", document.getElementById("sl-product").value.trim());
-        fd.append("quantity", document.getElementById("sl-quantity").value);
-        fd.append("condition", document.getElementById("sl-condition").value);
-        fd.append("notes", document.getElementById("sl-notes").value.trim());
+        fd.append("name", (document.getElementById("sl-name")?.value || "").trim());
+        fd.append("email", (document.getElementById("sl-email")?.value || "").trim());
+        fd.append("order_id", (document.getElementById("sl-order-id")?.value || "").trim());
+        // === CHANGED: DO NOT append single product text field here (avoid mismatch)
+        // fd.append("product", document.getElementById("sl-product").value.trim());
+        fd.append("quantity", (document.getElementById("sl-quantity")?.value || ""));
+        fd.append("condition", (document.getElementById("sl-condition")?.value || ""));
+        fd.append("notes", (document.getElementById("sl-notes")?.value || "").trim());
         // fd.append("base_price", document.getElementById("sl-base-price").value);
 
         // ✅ CUSTOMER ID ADD KARO
@@ -244,9 +358,20 @@ console.log("Second Loop extension script loaded");
             fd.append("customer_id", customerId);
         }
 
-        // append product_id hidden
-        if (productIdHidden && productIdHidden.value) {
+        // append product_id and product name for each selected product so backend receives matching arrays
+        if (selectedProducts.length > 0) {
+            selectedProducts.forEach(p => {
+                fd.append("product_id", p.id);
+                fd.append("product", p.title || "");
+                // optionally append per-product quantity if UI supports it in future:
+                // fd.append("quantity", p.quantity != null ? String(p.quantity) : "");
+            });
+        } else if (productIdHidden && productIdHidden.value) {
+            // fallback for legacy single selection (datalist/native)
             fd.append("product_id", productIdHidden.value);
+            // append product name from input (if any)
+            const typed = (productInput?.value || "").trim();
+            fd.append("product", typed || "");
         }
 
         // append all images
@@ -284,6 +409,7 @@ console.log("Second Loop extension script loaded");
             submitBtn.textContent = "submit request";
         }
     });
+
     async function loadProductsOnce() {
         if (productsLoaded) return;
         try {
@@ -335,7 +461,6 @@ console.log("Second Loop extension script loaded");
 
         matches.slice(0, 6).forEach(p => {
             const card = document.createElement("div");
-            // card.className = "sl-suggestion-card";
             card.className = "sl-product-card";
 
             const thumb = document.createElement("div");
@@ -373,61 +498,31 @@ console.log("Second Loop extension script loaded");
 
     // when user selects a product card
     function selectProduct(product) {
-        productInput.value = product.title || product.handle || "";
-        if (productIdHidden) productIdHidden.value = product.id || "";
+        // Prevent duplicates (by id or generated local id)
+        const id = product.id || product.handle || generateLocalProductId(product.title);
+        if (selectedProducts.some(p => p.id === id)) {
+            // already selected — focus or flash
+            productInput.focus();
+            return;
+        }
 
-        // hide suggestions
+        // push to selectedProducts
+        selectedProducts.push({
+            id,
+            title: product.title || product.handle || "",
+            vendor: product.vendor || "",
+            imageUrl: (product.images && product.images.nodes && product.images.nodes[0] && product.images.nodes[0].url) || ""
+        });
+
+        // clear suggestions and input UI
         if (suggestionsContainer) {
             suggestionsContainer.innerHTML = "";
             suggestionsContainer.style.display = "none";
         }
+        productInput.value = "";
 
-        // show selected card permanently
-        if (!selectedProductBox) return;
-
-        selectedProductBox.innerHTML = "";
-
-        const card = document.createElement("div");
-        card.className = "sl-selected-card";
-
-        const img = document.createElement("img");
-        const imgNode = product.images && product.images.nodes && product.images.nodes[0];
-        img.src = (imgNode && imgNode.url) ? imgNode.url : "";
-
-        const info = document.createElement("div");
-        info.className = "sl-selected-info";
-
-        const title = document.createElement("div");
-        title.textContent = product.title || "";
-
-        const vendor = document.createElement("small");
-        vendor.textContent = product.vendor || "";
-
-        info.appendChild(title);
-        info.appendChild(vendor);
-
-        // create remove button (cross)
-        const removeBtn = document.createElement("button");
-        removeBtn.type = "button";
-        removeBtn.className = "sl-remove-product";
-        removeBtn.title = "Remove selected product";
-        removeBtn.innerHTML = "&times;"; // ×
-        removeBtn.addEventListener("click", () => {
-            // clear UI
-            selectedProductBox.innerHTML = "";
-            // clear input + hidden id
-            productInput.value = "";
-            if (productIdHidden) productIdHidden.value = "";
-            // optional: re-focus to product input
-            productInput.focus();
-        });
-
-
-        card.appendChild(img);
-        card.appendChild(info);
-        card.appendChild(removeBtn);
-
-        selectedProductBox.appendChild(card);
+        // re-render all selected products (multiple)
+        renderSelectedProducts();
     }
 
     // try to auto-select product_id if exact title match (for datalist native selection)
@@ -466,60 +561,23 @@ console.log("Second Loop extension script loaded");
                     suggestionsContainer.style.display = "none";
                 }
 
-                // if user typed something and no productId set -> create a local id
                 const title = (productInput.value || "").trim();
-                if (title && productIdHidden && !productIdHidden.value) {
-                    // generate a local id and show mini selected card
+                if (title) {
+                    // create local product only if it isn't already present
                     const localId = generateLocalProductId(title);
-                    productIdHidden.value = localId;
-
-                    // show selected box similar to selectProduct but for a local product
-                    selectedProductBox.innerHTML = "";
-
-                    const card = document.createElement("div");
-                    card.className = "sl-selected-card";
-
-                    const placeholder = document.createElement("div");
-                    placeholder.className = "sl-selected-placeholder";
-                    placeholder.textContent = title[0]?.toUpperCase() || "P";
-                    placeholder.style.width = "48px";
-                    placeholder.style.height = "48px";
-                    placeholder.style.display = "flex";
-                    placeholder.style.alignItems = "center";
-                    placeholder.style.justifyContent = "center";
-                    placeholder.style.borderRadius = "6px";
-                    placeholder.style.background = "#f4f4f4";
-                    placeholder.style.fontWeight = "600";
-
-                    const info = document.createElement("div");
-                    info.className = "sl-selected-info";
-                    const titleEl = document.createElement("div");
-                    titleEl.textContent = title;
-                    const tag = document.createElement("small");
-                    tag.textContent = "Local product (not in Shopify)";
-                    tag.className = "muted";
-
-                    info.appendChild(titleEl);
-                    info.appendChild(tag);
-
-                    // remove button
-                    const removeBtn = document.createElement("button");
-                    removeBtn.type = "button";
-                    removeBtn.className = "sl-remove-product";
-                    removeBtn.title = "Remove selected product";
-                    removeBtn.innerHTML = "&times;";
-                    removeBtn.addEventListener("click", () => {
-                        selectedProductBox.innerHTML = "";
-                        productInput.value = "";
-                        productIdHidden.value = "";
-                        productInput.focus();
-                    });
-
-                    card.appendChild(placeholder);
-                    card.appendChild(info);
-                    card.appendChild(removeBtn);
-
-                    selectedProductBox.appendChild(card);
+                    const exists = selectedProducts.some(p => (p.id === localId) || ((p.title || "").toLowerCase() === title.toLowerCase()));
+                    if (!exists) {
+                        selectedProducts.push({
+                            id: localId,
+                            title,
+                            vendor: "Local product (not in Shopify)",
+                            imageUrl: null,
+                            local: true
+                        });
+                        renderSelectedProducts();
+                    }
+                    // clear input (optional)
+                    productInput.value = "";
                 }
             }, 200);
         });

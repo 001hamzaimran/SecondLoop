@@ -7,34 +7,150 @@ import path from "path";
 import { createShopifyCodeForCustomer } from "./Discount.Controller.js";
 import { sendDiscountEmail } from "../Middleware/EmailCode.Config.js";
 
+// const createPaybackForm = async (req, res) => {
+//   try {
+//     const {
+//       name,
+//       email,
+//       customer_id,
+//       order_id,
+//       product,
+//       product_id,
+//       quantity,
+//       base_price,
+//       condition,
+//       notes,
+//     } = req.body;
+
+//     console.log('Customer ID received:', customer_id);
+
+
+//     // Basic validation
+//     if (!name || !email || !product) {
+//       return res.status(400).json({ success: false, message: "Required fields are missing" });
+//     }
+
+//     // Files from multer
+//     const files = req.files || [];
+
+//     if (!Array.isArray(files) || files.length < 3 || files.length > 8) {
+//       // remove uploaded temp files if any
+//       files.forEach(f => {
+//         try { fs.unlinkSync(f.path); } catch (err) { /* ignore */ }
+//       });
+
+//       return res.status(400).json({
+//         success: false,
+//         message: "Please upload between 3 and 8 images",
+//       });
+//     }
+
+//     // Upload all files to Cloudinary concurrently
+//     const uploadFolder = process.env.CLOUDINARY_UPLOAD_FOLDER || "payback";
+//     const uploadedImageUrls = await Promise.all(
+//       files.map(async (file) => {
+//         const result = await cloudinary.uploader.upload(file.path, {
+//           folder: uploadFolder,
+//           // optional: transformations, e.g. limit to width
+//           // transformation: [{ width: 1200, crop: "limit" }]
+//         });
+//         return { url: result.secure_url, public_id: result.public_id, localPath: file.path };
+//       })
+//     );
+
+//     // Delete local temp files
+//     uploadedImageUrls.forEach(u => {
+//       try { fs.unlinkSync(u.localPath); } catch (err) { /* ignore */ }
+//     });
+
+//     const imageUrls = uploadedImageUrls.map(u => u.url);
+//     const hasBox = (req.body.has_box === "true" || req.body.has_box === true);
+
+
+//     // Create payback entry
+//     const payback = await PaybackModel.create({
+//       name,
+//       email,
+//       orderId: order_id,
+//       shopifyCustomerId: customer_id,
+//       productName: product,
+//       productId: product_id,
+//       quantity: quantity ? Number(quantity) : undefined,
+//       basePrice: Number(base_price),
+//       condition: condition?.toLowerCase() || "good",
+//       images: imageUrls,
+//       description: notes,
+//       hasBox: hasBox,
+//     });
+
+//     return res.status(201).json({
+//       success: true,
+//       message: "Payback form submitted successfully",
+//       data: payback,
+//     });
+//   } catch (error) {
+//     console.error("Create Payback Error:", error);
+
+//     // best-effort cleanup when req.files present
+//     if (req.files && Array.isArray(req.files)) {
+//       req.files.forEach(f => {
+//         try { fs.unlinkSync(f.path); } catch (err) { }
+//       });
+//     }
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal server error",
+//       error: error.message,
+//     });
+//   }
+// };
+
 const createPaybackForm = async (req, res) => {
   try {
+    // NOTE: multer will put text fields in req.body
     const {
       name,
       email,
       customer_id,
       order_id,
-      product,
-      product_id,
-      quantity,
-      base_price,
+      product,      // could be string or array (product titles)
+      product_id,   // could be string or array (product ids)
+      quantity,     // could be string/number or array
+      base_price,   // could be string/number or array (optional)
       condition,
       notes,
     } = req.body;
 
-    console.log('Customer ID received:', customer_id);
-
-
     // Basic validation
-    if (!name || !email || !product) {
+    if (!name || !email) {
       return res.status(400).json({ success: false, message: "Required fields are missing" });
+    }
+
+    // Normalize product inputs into arrays (defensive)
+    const normalizeToArray = (v) => {
+      if (v === undefined || v === null) return [];
+      if (Array.isArray(v)) return v;
+      // sometimes multer/urlencoded might present JSON strings — try to parse
+      try {
+        const parsed = JSON.parse(v);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) { /* ignore */ }
+      return [v];
+    };
+
+    const productIds = normalizeToArray(product_id);
+    const productNames = normalizeToArray(product);
+    const quantities = normalizeToArray(quantity);
+    const basePrices = normalizeToArray(base_price);
+
+    if (productIds.length === 0) {
+      return res.status(400).json({ success: false, message: "At least one product is required" });
     }
 
     // Files from multer
     const files = req.files || [];
-
     if (!Array.isArray(files) || files.length < 3 || files.length > 8) {
-      // remove uploaded temp files if any
       files.forEach(f => {
         try { fs.unlinkSync(f.path); } catch (err) { /* ignore */ }
       });
@@ -51,8 +167,6 @@ const createPaybackForm = async (req, res) => {
       files.map(async (file) => {
         const result = await cloudinary.uploader.upload(file.path, {
           folder: uploadFolder,
-          // optional: transformations, e.g. limit to width
-          // transformation: [{ width: 1200, crop: "limit" }]
         });
         return { url: result.secure_url, public_id: result.public_id, localPath: file.path };
       })
@@ -62,26 +176,43 @@ const createPaybackForm = async (req, res) => {
     uploadedImageUrls.forEach(u => {
       try { fs.unlinkSync(u.localPath); } catch (err) { /* ignore */ }
     });
-
     const imageUrls = uploadedImageUrls.map(u => u.url);
     const hasBox = (req.body.has_box === "true" || req.body.has_box === true);
 
+    // Build products array (align by index)
+    const products = productIds.map((pid, idx) => {
+      const nameForThis = productNames[idx] || productNames[0] || ""; // fallback to first or empty
+      const qty = quantities[idx] !== undefined ? Number(quantities[idx]) : (quantities.length === 1 ? Number(quantities[0]) : undefined);
+      const price = basePrices[idx] !== undefined ? Number(basePrices[idx]) : (basePrices.length === 1 ? Number(basePrices[0]) : undefined);
 
-    // Create payback entry
-    const payback = await PaybackModel.create({
+      return {
+        productId: pid,
+        productName: nameForThis,
+        quantity: qty && !Number.isNaN(qty) ? qty : undefined,
+        basePrice: price && !Number.isNaN(price) ? price : undefined,
+      };
+    });
+
+    // As a convenience for older code, copy first product into legacy fields (if exists)
+    const firstProduct = products[0] || {};
+    const topLevelQuantity = (typeof quantity === "string" || typeof quantity === "number") ? Number(quantity) : undefined;
+
+    const paybackData = {
       name,
       email,
       orderId: order_id,
       shopifyCustomerId: customer_id,
-      productName: product,
-      productId: product_id,
-      quantity: quantity ? Number(quantity) : undefined,
-      basePrice: Number(base_price),
+      products,
+      productName: firstProduct.productName || undefined,
+      productId: firstProduct.productId || undefined,
+      quantity: topLevelQuantity && !Number.isNaN(topLevelQuantity) ? topLevelQuantity : undefined,
       condition: condition?.toLowerCase() || "good",
       images: imageUrls,
       description: notes,
       hasBox: hasBox,
-    });
+    };
+
+    const payback = await PaybackModel.create(paybackData);
 
     return res.status(201).json({
       success: true,
@@ -91,7 +222,6 @@ const createPaybackForm = async (req, res) => {
   } catch (error) {
     console.error("Create Payback Error:", error);
 
-    // best-effort cleanup when req.files present
     if (req.files && Array.isArray(req.files)) {
       req.files.forEach(f => {
         try { fs.unlinkSync(f.path); } catch (err) { }
@@ -105,6 +235,7 @@ const createPaybackForm = async (req, res) => {
     });
   }
 };
+
 
 const getDataPaybackForm = async (req, res) => {
   try {
