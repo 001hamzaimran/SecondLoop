@@ -634,7 +634,7 @@ import "./Tradein.css";
 
 export default function Tradein() {
   // price rules (you can replace with API values)
-  const DEFAULT_PRICES = { good: 5000, fair: 3000, poor: 1000 };
+  const DEFAULT_PRICES = { new: 7000, good: 5000, fair: 3000, poor: 1000 };
 
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -760,7 +760,8 @@ export default function Tradein() {
 
   function openModal(request) {
     setSelected(request);
-    setSelectedImage(request.images && request.images[0]);
+    const firstImg = request.images && request.images.length ? request.images[0] : null;
+    setSelectedImage(firstImg);
     setOverridePrice(""); // reset override each time
     setModalOpen(true);
     setApproveAction("discount"); // default selection when opening
@@ -795,6 +796,7 @@ export default function Tradein() {
         body: JSON.stringify({
           id: selected.id,
           status: "approved",
+          paymentMethod: "discount",
           approvedPrice: final,
         }),
       });
@@ -856,6 +858,7 @@ export default function Tradein() {
         body: JSON.stringify({
           id: selected?.id,
           amount: final,
+          paymentMethod: "giftcard",
           message: `Your trade-in credit of ${final} has been issued. Thank you for using Second Loop!`,
         }),
       });
@@ -886,11 +889,47 @@ export default function Tradein() {
     }
   }
 
+  async function handleApproveCOD() {
+    if (!selected) return;
+    const final = overridePrice ? Number(overridePrice) : selected?.basePrice ?? 0;
+
+    try {
+      setLoading(true);
+      const res = await fetch("/api/update-tradein-request-status", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: selected.id,
+          status: "approved",
+          approvedPrice: final,
+          paymentMethod: "cod",
+        }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setStatus(selected.id, "approved", final);
+        toast.success("Approved — COD selected. Email sent to user with instructions.");
+        closeModal();
+      } else {
+        toast.error("Failed to approve COD: " + (data.message || "unknown"));
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Server error while approving COD");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+
   // new helper: contextual approve action
   async function handleApproveOrAction() {
     // If admin selected "giftcard" in dropdown, call the giftcard function
     if (approveAction === "giftcard") {
       await handleIssueCredit();
+    } else if (approveAction === "cod") {
+      await handleApproveCOD();
     } else {
       // default -> discount code flow
       await handleApprove();
@@ -1052,16 +1091,27 @@ export default function Tradein() {
             <div className="modal-body">
               <aside className="left-col">
                 <div className="preview">
-                  <button
+                  {/* <button
                     className="nav-arrow left"
                     onClick={() => {
                       const idx = selected.images.indexOf(selectedImage);
                       const newIdx = (idx - 1 + selected.images.length) % selected.images.length;
                       setSelectedImage(selected.images[newIdx]);
                     }}
+                  >&lt;</button> */}
+                  <button
+                    className="nav-arrow left"
+                    onClick={() => {
+                      const imgs = selected.images || [];
+                      if (!imgs.length) return;
+                      const idx = imgs.indexOf(selectedImage);
+                      const newIdx = (idx - 1 + imgs.length) % imgs.length;
+                      setSelectedImage(imgs[newIdx]);
+                    }}
+                    disabled={!selected.images || selected.images.length <= 1}
                   >&lt;</button>
 
-                  <img src={selectedImage} alt="selected" />
+                  {selectedImage ? <img src={selectedImage} alt="selected" /> : <div className="placeholder">No image</div>}
 
                   <button
                     className="nav-arrow right"
@@ -1154,6 +1204,7 @@ export default function Tradein() {
                       >
                         <option value="discount">Create Discount Code</option>
                         <option value="giftcard">Issue Gift Card</option>
+                        <option value="cod">Cash on Delivery (COD)</option>
                       </select>
                     </div>
 
@@ -1163,7 +1214,13 @@ export default function Tradein() {
                       onClick={handleApproveOrAction}
                       disabled={loading}
                     >
-                      {loading ? (approveAction === "giftcard" ? "Issuing Gift Card..." : "Creating Discount...") : "Approve"}
+                      {loading
+                        ? approveAction === "giftcard"
+                          ? "Issuing Gift Card..."
+                          : approveAction === "cod"
+                            ? "Approving (COD)..."
+                            : "Creating Discount..."
+                        : "Approve"}
                     </button>
 
                     {/* Reject button */}

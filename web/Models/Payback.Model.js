@@ -206,6 +206,18 @@ const PaybackSchema = new mongoose.Schema(
       type: Number,
     },
 
+    paymentMethod: {
+      type: String,
+      enum: ["discount", "giftcard", "cod"],
+      default: undefined
+    },
+
+    // optional: record any admin note
+    paymentNote: {
+      type: String,
+      trim: true
+    },
+
     percentage: {
       type: Number,
       min: 0,

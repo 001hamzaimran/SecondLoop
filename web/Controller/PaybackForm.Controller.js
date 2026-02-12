@@ -6,6 +6,7 @@ import path from "path";
 
 import { createShopifyCodeForCustomer } from "./Discount.Controller.js";
 import { sendDiscountEmail } from "../Middleware/EmailCode.Config.js";
+import { sendCODEmail } from "../Middleware/sendCODEmail.Config.js";
 
 // const createPaybackForm = async (req, res) => {
 //   try {
@@ -259,13 +260,22 @@ const updateStatusPaybackForm = async (req, res) => {
     console.log("Request Body:", req.body);
     console.log("Session:", res.locals?.shopify?.session?.shop);
 
-    const { id, status, approvedPrice: approvedPriceFromReq } = req.body;
-
-    if (approvedPriceFromReq === undefined) {
-      return res.status(400).json({
-        success: false,
-        message: "approvedPrice is required for approval"
-      });
+    const { id, status, approvedPrice: approvedPriceFromReq, paymentMethod } = req.body;
+    let finalPrice;
+    if (status === "approved") {
+      if (approvedPriceFromReq === undefined) {
+        return res.status(400).json({
+          success: false,
+          message: "approvedPrice is required for approval"
+        });
+      }
+      finalPrice = Number(approvedPriceFromReq);
+      if (Number.isNaN(finalPrice) || finalPrice < 0) {
+        return res.status(400).json({
+          success: false,
+          message: "approvedPrice must be a valid number"
+        });
+      }
     }
 
     // Validate status
@@ -278,6 +288,7 @@ const updateStatusPaybackForm = async (req, res) => {
 
     // Find payback request
     const payback = await PaybackModel.findById(id);
+
     if (!payback) {
       return res.status(404).json({
         success: false,
@@ -307,15 +318,6 @@ const updateStatusPaybackForm = async (req, res) => {
       // =================== APPROVED FLOW ===================
       console.log("Starting approval process...");
 
-      let finalPrice = Number(approvedPriceFromReq);
-
-      if (Number.isNaN(finalPrice) || finalPrice < 0) {
-        return res.status(400).json({
-          success: false,
-          message: "approvedPrice must be a valid number"
-        });
-      }
-
       // Build options for discount creation
       const options = {
         amount: finalPrice,
@@ -324,18 +326,45 @@ const updateStatusPaybackForm = async (req, res) => {
         endDays: 60
       };
 
-      // Get Shopify session
-      const session = res.locals?.shopify?.session;
-      if (!session) {
-        console.error("Shopify session not found in res.locals");
-        return res.status(401).json({
-          success: false,
-          message: "Shopify authentication required"
-        });
-      }
+
 
       let shopifyResult;
       try {
+        if (paymentMethod === 'cod') {
+          payback.status = 'approved';
+          payback.approvedPrice = finalPrice;
+          payback.paymentMethod = 'cod';
+          payback.approvedAt = new Date();
+          await payback.save();
+
+          // send COD email
+          await sendCODEmail({
+            to: payback.email,
+            amount: finalPrice,
+            name: payback.name,
+            paybackId: payback._id
+          }).catch(err => {
+            console.error("COD email send failed", err);
+            // optionally update DB with emailError
+          });
+
+          return res.status(200).json({
+            success: true,
+            message: "Request approved (COD). User notified by email.",
+            data: payback
+          });
+        }
+
+        // Get Shopify session
+        const session = res.locals?.shopify?.session;
+        if (!session) {
+          console.error("Shopify session not found in res.locals");
+          return res.status(401).json({
+            success: false,
+            message: "Shopify authentication required"
+          });
+        }
+
         console.log("Creating Shopify discount code for customer:", payback.email, "options:", options);
         shopifyResult = await createShopifyCodeForCustomer(session, payback, options);
 
@@ -347,6 +376,7 @@ const updateStatusPaybackForm = async (req, res) => {
           payback.status = "approved";
           payback.approvedCode = code;
           payback.approvedPrice = finalPrice;
+          payback.paymentMethod = 'discount';
           payback.approvedAt = new Date();
           payback.updatedAt = new Date();
 
