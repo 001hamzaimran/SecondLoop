@@ -1,9 +1,17 @@
 import transporter from "./Email.js";
 
-export async function sendCODEmail({ to, amount, name }) {
+export async function sendCODEmail({ to, amount, name, store }) {
   try {
+    const {
+      country,
+      currencyCode,
+      domain,
+      email,
+      storeName
+    } = store;
+
     const formattedAmount = amount
-      ? `$ ${Number(amount).toLocaleString()}`
+      ? `${currencyCode || "$"} ${Number(amount).toLocaleString()}`
       : "—";
 
     const subject = "Your Trade-In Request Has Been Approved";
@@ -20,12 +28,19 @@ Alternatively, you may collect the payment in cash from our office.
 
 Once we receive and verify the delivery of your product, the approved amount will be transferred to you promptly.
 
-If you have any questions, feel free to contact us.
+-----------------------------------
+Store Information:
+Store Name: ${storeName || "Second Loop"}
+Store Email: ${email || "-"}
+Store Domain: ${domain || "-"}
+Country: ${country || "-"}
+Currency: ${currencyCode || "-"}
+-----------------------------------
 
-Thank you for choosing Second Loop.
+Thank you for choosing ${storeName || "Second Loop"}.
 
 Best regards,  
-Second Loop Team
+${storeName || "Second Loop"} Team
 `;
 
     const html = `
@@ -57,21 +72,28 @@ Second Loop Team
           the approved amount will be transferred to you promptly.
         </p>
 
+        <hr style="margin:20px 0;" />
+
+        <h3 style="color:#2c3e50;">Store Information</h3>
         <p>
-          If you have any questions or need assistance, please feel free to contact us.
+          <strong>Store Name:</strong> ${storeName || "Second Loop"}<br/>
+          <strong>Store Email:</strong> ${email || "-"}<br/>
+          <strong>Store Domain:</strong> ${domain || "-"}<br/>
+          <strong>Country:</strong> ${country || "-"}<br/>
+          <strong>Currency:</strong> ${currencyCode || "-"}
         </p>
 
         <br/>
 
         <p>
-          Thank you for choosing <strong>Second Loop</strong>.<br/>
-          <strong>Second Loop Team</strong>
+          Thank you for choosing <strong>${storeName || "Second Loop"}</strong>.<br/>
+          <strong>${storeName || "Second Loop"} Team</strong>
         </p>
       </div>
     `;
 
     const info = await transporter.sendMail({
-      from: `"Second Loop" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
+      from: `"${storeName || "Second Loop"}" <${process.env.EMAIL_FROM || process.env.SMTP_USER}>`,
       to,
       subject,
       text,

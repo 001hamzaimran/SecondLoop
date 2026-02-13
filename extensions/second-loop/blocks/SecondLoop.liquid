@@ -1,7 +1,13 @@
 <div class="SecondLoop vip">
   <h2>Welcome to Second Loop!</h2>
-  <p>Submit trade-in or payback requests quickly & easily.</p>
-  <button id="second-loop-button" type="button">Payback Form</button>
+  <p>Submit Trade-In Requests Quickly & Easily.</p>
+  <button
+    style="background-color: {{ section.settings.button_color }} !important; color: {{ section.settings.text_color }};"
+    id="second-loop-button"
+    type="button"
+  >
+    Trade In Form
+  </button>
 </div>
 
 <!-- YEH ADD KARO LIQUID KE START MEIN -->
@@ -34,7 +40,7 @@
 
   <div class="secondloop-modal-panel vip-panel" role="document">
     <header class="secondloop-modal-header">
-      <h3 id="sl-modal-title">Payback / Trade-in Form</h3>
+      <h3 id="sl-modal-title">Trade-in Form</h3>
       <button class="secondloop-close" id="second-loop-close" aria-label="close form">&times;</button>
     </header>
 
@@ -54,11 +60,6 @@
         </label>
 
         <label class="sl-field">
-          <span class="sl-label">Order ID (optional)</span>
-          <input type="text" name="order_id" id="sl-order-id">
-        </label>
-
-        <label class="sl-field">
           <span class="sl-label">Product Name *</span>
 
           <input type="text" name="product" id="sl-product" required>
@@ -72,14 +73,6 @@
 
           <input type="hidden" name="product_id" id="sl-product-id">
         </label>
-
-        {% comment %}
-          <label class="sl-field">
-            <span class="sl-label">Base Price *</span>
-            <input type="number" name="base_price" id="sl-base-price" min="0" required>
-            <div class="sl-error" id="err-base-price"></div>
-          </label>
-        {% endcomment %}
 
         <label class="sl-field">
           <span class="sl-label">Quantity (optional)</span>
@@ -119,7 +112,7 @@
         </label>
 
         <div class="sl-actions">
-          <button type="submit" id="sl-submit" class="vip-btn">Submit Request</button>
+          <button type="submit" id="sl-submit" class="vip-btn">Submit My Trade In Request</button>
           <button type="button" id="sl-cancel" class="vip-btn-secondary">Cancel</button>
         </div>
 
@@ -134,6 +127,20 @@
   "name": "Second Loop",
   "target": "section",
   "stylesheet": "style.css",
-  "javascript": "script.js"
+  "javascript": "script.js",
+  "settings": [
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text Color",
+      "default": "#000000"
+    },
+    {
+      "type": "color",
+      "id": "button_color",
+      "label": "Button Color",
+      "default": "#ff0000"
+    }
+  ]
 }
 {% endschema %}

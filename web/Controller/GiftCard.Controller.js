@@ -4,7 +4,8 @@ import shopify from "../shopify.js";
 
 export const createGiftCardForCustomer = async (req, res) => {
   try {
-    const { id, amount, message } = req.body;
+    const { id, amount, message, paymentMethod, } = req.body;
+
 
     if (!id) return res.status(400).json({ success: false, message: "id is required" });
     if (amount === undefined || amount === null) return res.status(400).json({ success: false, message: "amount is required" });
@@ -49,12 +50,6 @@ export const createGiftCardForCustomer = async (req, res) => {
     const variables = {
       input: {
         initialValue: String(amount),
-        // ❌ OLD WAY (WRONG):
-        // recipientAttributes: {
-        //   email: payback.email,
-        //   note: message,
-        //   firstName: payback.name
-        // },
 
         // ✅ NEW WAY (CORRECT):
         note: message || `Your Gift Card of PKR ${amount} has been issued.`,
@@ -91,6 +86,7 @@ export const createGiftCardForCustomer = async (req, res) => {
     payback.approvedPrice = Number(amount);
     payback.approvedAt = new Date();
     payback.approvedGiftCardId = payload.giftCard?.id; // giftCardCode
+    payback.paymentMethod = paymentMethod;
 
     if (payload.giftCardCode) {
       payback.approvedCode = payload.giftCardCode;

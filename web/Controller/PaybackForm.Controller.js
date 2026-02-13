@@ -260,7 +260,7 @@ const updateStatusPaybackForm = async (req, res) => {
     console.log("Request Body:", req.body);
     console.log("Session:", res.locals?.shopify?.session?.shop);
 
-    const { id, status, approvedPrice: approvedPriceFromReq, paymentMethod } = req.body;
+    const { id, status, approvedPrice: approvedPriceFromReq, paymentMethod, store, } = req.body;
     let finalPrice;
     if (status === "approved") {
       if (approvedPriceFromReq === undefined) {
@@ -342,7 +342,8 @@ const updateStatusPaybackForm = async (req, res) => {
             to: payback.email,
             amount: finalPrice,
             name: payback.name,
-            paybackId: payback._id
+            paybackId: payback._id,
+            store
           }).catch(err => {
             console.error("COD email send failed", err);
             // optionally update DB with emailError
@@ -390,7 +391,8 @@ const updateStatusPaybackForm = async (req, res) => {
             to: payback.email,
             code,
             amount: payback.approvedPrice,
-            productName: payback.productName
+            productName: payback.productName,
+            store
           })
             .then(emailInfo => {
               console.log("✅ Email sent successfully:", {

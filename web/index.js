@@ -10,13 +10,15 @@ import productCreator from "./product-creator.js";
 import PrivacyWebhookHandlers from "./privacy.js";
 import PaybackRouter from "./Routes/Payback.Route.js";
 import ProductRouter from "./Routes/Product.Route.js";
+import StoreRouter from "./Routes/Store.Route.js";
+import { afterAuth } from "./Middleware/shopifyAuth.js";
 
 const PORT = parseInt(
   process.env.BACKEND_PORT || process.env.PORT || "3000",
   10
 );
 
- connectDB();
+connectDB();
 
 
 const STATIC_PATH =
@@ -58,13 +60,22 @@ app.use("/api/*", shopify.validateAuthenticatedSession());
 app.use("/proxy/*", authenticateUser);
 
 
-const routes = [PaybackRouter ,ProductRouter]
+const routes = [PaybackRouter, ProductRouter, StoreRouter]
 
 routes.forEach((route) => {
   app.use("/api", route);
   app.use("/proxy", route);
 })
 
+// Shopify auth callback route
+app.get(
+  shopify.config.auth.callbackPath,
+  shopify.auth.callback(),
+  afterAuth,
+  (req, res) => {
+    res.redirect("/"); // dashboard
+  }
+);
 
 app.use(shopify.cspHeaders());
 app.use(serveStatic(STATIC_PATH, { index: false }));

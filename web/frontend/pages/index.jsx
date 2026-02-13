@@ -1,106 +1,109 @@
-// import {
-//   Page,
-//   Card,
-//   Button,
-//   Layout,
-//   Text,
-//   Stack,
-//   Badge,
-// } from "@shopify/polaris";
-// import { useNavigate } from "react-router-dom";
-
-// export default function HomePage() {
-//   const navigate = useNavigate();
-
-//   return (
-//     <Page title="Dashboard">
-//       <Layout>
-//         {/* HERO SECTION */}
-//         <Layout.Section>
-//           <Card sectioned>
-//             <Stack vertical spacing="extraLoose">
-//               <Stack vertical spacing="tight">
-//                 <Text as="h1" variant="headingXl">
-//                   👋 Welcome to <strong>Second Loop</strong>
-//                 </Text>
-
-//                 <Text variation="subdued">
-//                   The smartest way to manage trade-ins, verify product
-//                   conditions, and turn returns into revenue.
-//                 </Text>
-//               </Stack>
-
-//               <Stack spacing="tight">
-//                 <Button
-//                   primary
-//                   size="large"
-//                   onClick={() => navigate("/tradein")}
-//                 >
-//                   Start Trade-In
-//                 </Button>
-
-//               </Stack>
-//             </Stack>
-//           </Card>
-//         </Layout.Section>
-
-//         {/* FEATURES */}
-//         <Layout.Section>
-//           <Layout>
-//             <Layout.Section oneThird>
-//               <Card sectioned>
-//                 <Stack vertical spacing="tight">
-//                   <Text variant="headingSm">📦 Trade-In Orders</Text>
-//                   <Text variation="subdued">
-//                     Create, track, and manage customer trade-in requests.
-//                   </Text>
-//                   <Badge status="success">Core Feature</Badge>
-//                 </Stack>
-//               </Card>
-//             </Layout.Section>
-
-//             <Layout.Section oneThird>
-//               <Card sectioned>
-//                 <Stack vertical spacing="tight">
-//                   <Text variant="headingSm">📸 Photo Verification</Text>
-//                   <Text variation="subdued">
-//                     Review uploaded images to verify product condition.
-//                   </Text>
-//                   <Badge status="info">Smart Review</Badge>
-//                 </Stack>
-//               </Card>
-//             </Layout.Section>
-
-//             <Layout.Section oneThird>
-//               <Card sectioned>
-//                 <Stack vertical spacing="tight">
-//                   <Text variant="headingSm">💸 Payback Engine</Text>
-//                   <Text variation="subdued">
-//                     Automatically calculate trade-in value and payouts.
-//                   </Text>
-//                   <Badge status="attention">Revenue</Badge>
-//                 </Stack>
-//               </Card>
-//             </Layout.Section>
-//           </Layout>
-//         </Layout.Section>
-//       </Layout>
-//     </Page>
-//   );
-// }
-import React from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./HomePage.css";
+import { ContextAuth } from "../contextApi/contextAuth";
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
 
-  const metrics = {
-    totalRequests: 128,
-    pending: 21,
-    approved: 83,
-    estPayout: "£3,420",
-  };
+  const state = useContext(ContextAuth);
+  const { store, setStore, tradeInReq, setTradeInRequests } = state;
+
+
+  const totalRequests = tradeInReq?.length || 0;
+
+  const pending = tradeInReq?.filter(
+    (item) => item.status === "pending"
+  ).length || 0;
+
+  const approvedItems = tradeInReq?.filter(
+    (item) => item.status === "approved"
+  ) || [];
+
+  const approved = approvedItems.length;
+
+  // Estimated payout = sum of approvedPrice * quantity
+  const estPayoutValue = approvedItems.reduce((total, item) => {
+    const price = Number(item.approvedPrice) || 0;
+    const qty = Number(item.quantity) || 1;
+    return total + (price * qty);
+  }, 0);
+
+  // Format with currency (store currency if available)
+  const currency = store?.currencyCode || "USD";
+
+  const estPayout = `${estPayoutValue.toLocaleString()}`;
+
+  console.log(estPayout)
+
+  // Helper: return the first Shopify product's name (or empty string)
+  function getShopifyProductName(products = []) {
+    if (!Array.isArray(products)) return "";
+
+    const shopifyProduct = products.find(
+      (p) =>
+        p &&
+        typeof p.productId === "string" &&
+        p.productId.startsWith("gid://shopify/Product/")
+    );
+
+    return shopifyProduct?.productName || "";
+  }
+
+  async function fetchTradeinRequests() {
+    try {
+      const res = await fetch("/api/get-tradein-request");
+      const data = await res.json();
+
+      console.log(data.data, "<<<< data is here");
+
+      if (!data.success) {
+        toast.error("Failed to load trade-in requests");
+        return;
+      }
+
+      // Map DB -> UI, show ONLY Shopify product name
+      const formatted = data.data.map((item) => {
+        const shopifyProductName = getShopifyProductName(item.products);
+
+        return {
+          id: item._id,
+          customer: item.name,
+          email: item.email,
+          // ONLY the Shopify product name (or a placeholder)
+          product: shopifyProductName || "—",
+          // keep raw products array if you need it in modal later
+          products: item.products || [],
+          condition: item.condition,
+          status: item.status,
+          date: new Date(item.createdAt).toISOString().slice(0, 10),
+          images: item.images?.length ? item.images.map((img) => img.url || img) : [],
+          basePrice: item.basePrice,
+          quantity: item.quantity,
+          description: item.description,
+          percentage: item.percentage,
+          approvedPrice: item.approvedPrice,
+          approvedCode: item.approvedCode,
+          shopifyCustomerId: item.shopifyCustomerId,
+          hasBox: item.hasBox,
+          paymentMethod: item.paymentMethod
+        };
+      });
+      setTradeInRequests(formatted);
+    } catch (err) {
+      console.error(err);
+      toast.error("Server error while loading requests");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchTradeinRequests();
+  }, []);
+
+  console.log(tradeInReq, " <<<<<<< treadein req")
 
   return (
     <div className="dashboard">
@@ -123,34 +126,35 @@ export default function HomePage() {
             >
               View Requests
             </button>
-            <button
+            {/* <button
               className="btn secondary"
               onClick={() => navigate("/tradeinrules")}
             >
               Pricing Rules
-            </button>
+            </button> */}
           </div>
         </div>
 
         <div className="hero-metrics">
           <div className="metric-card">
-            <h2>{metrics.totalRequests}</h2>
+            <h2>{totalRequests}</h2>
             <span>Total Requests</span>
           </div>
 
           <div className="metric-card highlight">
-            <h2>{metrics.pending}</h2>
+            <h2>{pending}</h2>
             <span>Pending</span>
           </div>
 
           <div className="metric-card success">
-            <h2>{metrics.approved}</h2>
+            <h2>{approved}</h2>
             <span>Approved</span>
           </div>
 
           <div className="metric-card payout">
-            <h2>{metrics.estPayout}</h2>
-            <span>Est. Payout</span>
+            <span>{currency}</span>
+            <h2 >{estPayout}</h2>
+            <span> Est. Payout</span>
           </div>
         </div>
       </div>

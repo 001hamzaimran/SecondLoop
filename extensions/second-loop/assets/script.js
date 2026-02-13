@@ -1,7 +1,6 @@
 console.log("Second Loop extension script loaded");
 
 (function () {
-    // safe guard: if Liquid didn't inject currentShopifyCustomer, access may fail in console.log
     try { console.log("Second Loop extension script executing", window.currentShopifyCustomer && window.currentShopifyCustomer.id); } catch (e) {}
 
     const openBtn = document.getElementById("second-loop-button");
@@ -24,8 +23,8 @@ console.log("Second Loop extension script loaded");
     const productIdHidden = document.getElementById("sl-product-id");
 
     // ---------- state ----------
-    let currentFiles = []; // all selected images
-    let allProducts = []; // will hold products from backend
+    let currentFiles = [];
+    let allProducts = []; 
     let suggestionTimeout = null;
     let productsLoaded = false;
     let selectedProducts = [];
@@ -38,7 +37,6 @@ console.log("Second Loop extension script loaded");
         }, 10);
         document.addEventListener("keydown", onKeyDown);
 
-        // 🔥 load products when modal opens
         loadProductsOnce();
     }
 
@@ -51,11 +49,9 @@ console.log("Second Loop extension script loaded");
         formMessage.textContent = "";
         document.removeEventListener("keydown", onKeyDown);
 
-        // clear product suggestions and hidden id on close
         if (suggestionsContainer) suggestionsContainer.innerHTML = "";
         if (productIdHidden) productIdHidden.value = "";
 
-        // clear selected products UI & state (optional: keep if you want)
         selectedProducts = [];
         renderSelectedProducts();
     }
@@ -69,7 +65,6 @@ console.log("Second Loop extension script loaded");
     overlay && overlay.addEventListener("click", hideModal);
     cancelBtn && cancelBtn.addEventListener("click", hideModal);
 
-    // ===== IMAGE PREVIEWS =====
     function clearPreviews() {
         if (!previews) return;
         previews.innerHTML = "";
@@ -98,7 +93,6 @@ console.log("Second Loop extension script loaded");
             previews.appendChild(thumb);
         });
 
-        // rebuild input.files for submission
         const dt = new DataTransfer();
         currentFiles.forEach(f => dt.items.add(f));
         imageInput.files = dt.files;
@@ -112,7 +106,6 @@ console.log("Second Loop extension script loaded");
             const card = document.createElement("div");
             card.className = "sl-selected-card multi";
 
-            // thumbnail (image or placeholder)
             const thumb = document.createElement("div");
             thumb.className = "sl-selected-thumb";
             if (p.imageUrl) {
@@ -146,7 +139,6 @@ console.log("Second Loop extension script loaded");
             removeBtn.title = "Remove";
             removeBtn.innerHTML = "&times;";
             removeBtn.addEventListener("click", () => {
-                // remove from selectedProducts by id
                 selectedProducts = selectedProducts.filter(sp => sp.id !== p.id);
                 renderSelectedProducts();
             });
@@ -154,9 +146,6 @@ console.log("Second Loop extension script loaded");
 
             selectedProductBox.appendChild(card);
         });
-
-        // Update native hidden input if you still want single-value fallback (optional)
-        // You can keep the original single hidden input untouched; we will send multiple IDs on submit.
     }
 
 
@@ -185,7 +174,6 @@ console.log("Second Loop extension script loaded");
         return `local-${Date.now()}-${rand}-${slug}`.slice(0, 120); // limit length
     }
 
-    // ===== VALIDATION =====
     function clearErrors() {
         ["err-name", "err-email", "err-product", "err-condition", "err-images"].forEach(id => {
             const el = document.getElementById(id);
@@ -203,7 +191,6 @@ console.log("Second Loop extension script loaded");
         let ok = true;
         const name = (document.getElementById("sl-name")?.value || "").trim();
         const email = (document.getElementById("sl-email")?.value || "").trim();
-        // const product = (document.getElementById("sl-product")?.value || "").trim();
         const condition = document.getElementById("sl-condition")?.value;
 
         if (!name) { showError("err-name", "name is required"); ok = false; }
@@ -213,28 +200,22 @@ console.log("Second Loop extension script loaded");
             const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!re.test(email)) { showError("err-email", "enter a valid email"); ok = false; }
         }
-        // product field itself is optional because we allow selectedProducts
         if (!condition) { showError("err-condition", "please select condition"); ok = false; }
         if (currentFiles.length < 3) { showError("err-images", "please upload at least 3 image"); ok = false; }
         if (currentFiles.length > 8) { showError("err-images", "maximum 8 images allowed"); ok = false; }
 
-        // require at least one selected product
         if (selectedProducts.length === 0 && !(productIdHidden && productIdHidden.value)) {
             showError("err-product", "please select at least one product");
             ok = false;
         }
-
         return ok;
     }
 
-    // Customer get karne ka function - SIMPLIFIED
     async function getShopifyCustomer() {
-        // Method 1: Liquid se (Sabse reliable)
         if (window.currentShopifyCustomer) {
             const cidInput = document.getElementById("customer_id_input");
             if (cidInput) cidInput.value = window.currentShopifyCustomer.id;
 
-            // Auto-fill name/email only if empty
             const nameEl = document.getElementById("sl-name");
             const emailEl = document.getElementById("sl-email");
             if (nameEl && !nameEl.value.trim() && window.currentShopifyCustomer.name) nameEl.value = window.currentShopifyCustomer.name;
@@ -243,13 +224,11 @@ console.log("Second Loop extension script loaded");
             return window.currentShopifyCustomer; // 🔥 ADD THIS
         }
 
-        // Method 2: Shopify global object
         if (typeof Shopify !== 'undefined' && Shopify.customer) {
             console.log('Found customer via Shopify global:', Shopify.customer);
             return Shopify.customer;
         }
 
-        // Method 3: Check account page (fallback)
         try {
             const response = await fetch('/account', {
                 method: 'GET',
@@ -294,15 +273,11 @@ console.log("Second Loop extension script loaded");
         if (productIdHidden) productIdHidden.value = ""; // don't set single hidden for multi-select
     }
 
-    // handle Enter key: select typed product immediately
     if (productInput) {
         productInput.addEventListener("keydown", async (e) => {
-            // if suggestions are visible and arrow/enter handling might be different,
-            // we keep it simple: Enter selects typed value as local product (unless matched to a real product)
             if (e.key === "Enter") {
                 e.preventDefault();
 
-                // try to match exact product title first (case-insensitive)
                 await loadProductsOnce();
                 const typed = (productInput.value || "").trim();
                 if (!typed) return;
@@ -345,43 +320,32 @@ console.log("Second Loop extension script loaded");
         const fd = new FormData();
         fd.append("name", (document.getElementById("sl-name")?.value || "").trim());
         fd.append("email", (document.getElementById("sl-email")?.value || "").trim());
-        fd.append("order_id", (document.getElementById("sl-order-id")?.value || "").trim());
         // === CHANGED: DO NOT append single product text field here (avoid mismatch)
-        // fd.append("product", document.getElementById("sl-product").value.trim());
         fd.append("quantity", (document.getElementById("sl-quantity")?.value || ""));
         fd.append("condition", (document.getElementById("sl-condition")?.value || ""));
         fd.append("notes", (document.getElementById("sl-notes")?.value || "").trim());
-        // fd.append("base_price", document.getElementById("sl-base-price").value);
 
         // ✅ CUSTOMER ID ADD KARO
         if (customerId) {
             fd.append("customer_id", customerId);
         }
 
-        // append product_id and product name for each selected product so backend receives matching arrays
         if (selectedProducts.length > 0) {
             selectedProducts.forEach(p => {
                 fd.append("product_id", p.id);
                 fd.append("product", p.title || "");
-                // optionally append per-product quantity if UI supports it in future:
-                // fd.append("quantity", p.quantity != null ? String(p.quantity) : "");
             });
         } else if (productIdHidden && productIdHidden.value) {
-            // fallback for legacy single selection (datalist/native)
             fd.append("product_id", productIdHidden.value);
-            // append product name from input (if any)
             const typed = (productInput?.value || "").trim();
             fd.append("product", typed || "");
         }
 
-        // append all images
         currentFiles.forEach(file => fd.append("images", file, file.name));
 
-        // append has_box boolean
         const hasBox = hasBoxCheckbox && hasBoxCheckbox.checked;
         fd.append("has_box", hasBox ? "true" : "false");
 
-        // 3. BACKEND KO SEND KARO
         const endpoint = "/apps/secondloop/payback-form";
         try {
             const res = await fetch(endpoint, {
