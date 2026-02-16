@@ -61,6 +61,66 @@
     margin-bottom: 12px;
 }
 
+/* textarea container */
+.sl-textarea-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+/* label text */
+.sl-textarea-field span {
+    font-size: 14px;
+    font-weight: 600;
+    color: #0F172A;
+}
+
+/* main textarea */
+.sl-textarea {
+
+    width: 100%;
+
+    padding: 12px 14px;
+
+    border-radius: 10px;
+
+    border: 1px solid #CBD5E1;
+
+    background: #FFFFFF;
+
+    font-size: 14px;
+
+    font-family: inherit;
+
+    resize: vertical;
+
+    min-height: 100px;
+
+    transition: all 0.2s ease;
+}
+
+
+/* focus effect */
+.sl-textarea:focus {
+
+    outline: none;
+
+    border-color: #6366F1;
+
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+
+}
+
+
+/* placeholder style */
+.sl-textarea::placeholder {
+
+    color: #94A3B8;
+
+}
+
+
 .sl-color-field {
     flex: 1;
     display: flex;

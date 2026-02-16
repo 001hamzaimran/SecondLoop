@@ -13,7 +13,8 @@ export default function Settings({ initial = {}, onSave, apiBase = '/api/setting
         submitBg: initial.submitBg || '#10b981',
         submitText: initial.submitText || '#ffffff',
         cancelBg: initial.cancelBg || '#ef4444',
-        cancelText: initial.cancelText || '#ffffff'
+        cancelText: initial.cancelText || '#ffffff',
+        address: initial.address || "office address goes here"
     };
 
     const [mainBg, setMainBg] = useState(defaults.mainBg);
@@ -28,6 +29,7 @@ export default function Settings({ initial = {}, onSave, apiBase = '/api/setting
     const [submitText, setSubmitText] = useState(defaults.submitText);
     const [cancelBg, setCancelBg] = useState(defaults.cancelBg);
     const [cancelText, setCancelText] = useState(defaults.cancelText);
+    const [address, setAddress] = useState(defaults.address);
 
     const [saved, setSaved] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -65,6 +67,7 @@ export default function Settings({ initial = {}, onSave, apiBase = '/api/setting
                     setSubmitText(d.submitText ?? defaults.submitText);
                     setCancelBg(d.cancelBg ?? defaults.cancelBg);
                     setCancelText(d.cancelText ?? defaults.cancelText);
+                    setAddress(d.address ?? defaults.address);
                 } else {
                     // if backend didn't return data, ensure UI uses defaults
                     setMainBg(defaults.mainBg);
@@ -77,6 +80,7 @@ export default function Settings({ initial = {}, onSave, apiBase = '/api/setting
                     setSubmitText(defaults.submitText);
                     setCancelBg(defaults.cancelBg);
                     setCancelText(defaults.cancelText);
+                    setAddress(defaults.address);
                 }
             } catch (err) {
                 console.error('Failed to fetch settings:', err);
@@ -101,7 +105,8 @@ export default function Settings({ initial = {}, onSave, apiBase = '/api/setting
             submitBg,
             submitText,
             cancelBg,
-            cancelText
+            cancelText,
+            address
         };
 
         // call parent callback if provided (optional, local-only)
@@ -129,7 +134,7 @@ export default function Settings({ initial = {}, onSave, apiBase = '/api/setting
                 setSubmitText(d.submitText ?? payload.submitText);
                 setCancelBg(d.cancelBg ?? payload.cancelBg);
                 setCancelText(d.cancelText ?? payload.cancelText);
-
+                setAddress(d.address ?? payload.address);
                 setSaved(true);
             } else {
                 console.error('Save failed:', json);
@@ -153,6 +158,7 @@ export default function Settings({ initial = {}, onSave, apiBase = '/api/setting
         setSubmitText(defaults.submitText);
         setCancelBg(defaults.cancelBg);
         setCancelText(defaults.cancelText);
+        setAddress(defaults.address);
 
         // persist defaults to backend (PUT)
         setSaving(true);
@@ -177,6 +183,7 @@ export default function Settings({ initial = {}, onSave, apiBase = '/api/setting
                 setSubmitText(d.submitText ?? defaults.submitText);
                 setCancelBg(d.cancelBg ?? defaults.cancelBg);
                 setCancelText(d.cancelText ?? defaults.cancelText);
+                setAddress(d.address ?? defaults.address);
             } else {
                 console.error('Reset failed:', json);
             }
@@ -285,6 +292,20 @@ export default function Settings({ initial = {}, onSave, apiBase = '/api/setting
                                 <span>Form Cancel — Text</span>
                                 <input type="color" value={cancelText} onChange={(e) => setCancelText(e.target.value)} />
                                 <input className="hex-input" value={cancelText} onChange={(e) => setCancelText(e.target.value)} />
+                            </label>
+                        </div>
+
+                        <div className="sl-row">
+                            <label className="sl-textarea-field">
+                                <span>Trade-in Address</span>
+
+                                <textarea
+                                    className="sl-textarea"
+                                    placeholder="Enter the address where customers should send their trades..."
+                                    value={address}
+                                    onChange={(e) => setAddress(e.target.value)}
+                                    rows={4}
+                                />
                             </label>
                         </div>
                     </div>

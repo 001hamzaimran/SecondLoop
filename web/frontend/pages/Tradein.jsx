@@ -70,7 +70,8 @@ export default function Tradein() {
       return (
         (r.customer || "").toLowerCase().includes(q) ||
         (r.product || "").toLowerCase().includes(q) ||
-        (r.id || "").toLowerCase().includes(q)
+        (r.orderId || "").toLowerCase().includes(q) ||
+        (r.email || "").toLowerCase().includes(q)
       );
     });
   }, [requests, query, filterStatus]);
@@ -96,7 +97,7 @@ export default function Tradein() {
           customer: item.name,
           email: item.email,
           // ONLY the Shopify product name (or a placeholder)
-          product: shopifyProductName || "—",
+          product: shopifyProductName || item.productName || "—",
           // keep raw products array if you need it in modal later
           products: item.products || [],
           orderId: item.orderId,
@@ -418,7 +419,7 @@ export default function Tradein() {
                   </td>
 
                   <td>
-                    <div className="product">{r.product}...</div>
+                    <div className="product">{r.product}</div>
                   </td>
 
                   <td>

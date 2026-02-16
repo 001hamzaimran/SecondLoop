@@ -16,6 +16,7 @@ console.log("Second Loop extension script loaded");
     const formMessage = document.getElementById("sl-form-message");
     const selectedProductBox = document.getElementById("sl-selected-product");
     const hasBoxCheckbox = document.getElementById("sl-has-box");
+    const address = document.getElementById("address");
 
     // ---------- NEW: product elements ----------
     const productInput = document.getElementById("sl-product");
@@ -61,6 +62,8 @@ console.log("Second Loop extension script loaded");
             applySettings(settings);
             settingsLoaded = true;
             console.log("SecondLoop settings applied", settings);
+            address.textContent = settings.address || defaultSettings.address;
+
         } catch (err) {
             // fallback to defaults (do not break UI)
             console.warn("Could not load settings, using defaults:", err);
@@ -89,7 +92,6 @@ console.log("Second Loop extension script loaded");
             root.style.setProperty('--sl-submit-text', settings.submitText || defaultSettings.submitText);
             root.style.setProperty('--sl-cancel-bg', settings.cancelBg || defaultSettings.cancelBg);
             root.style.setProperty('--sl-cancel-text', settings.cancelText || defaultSettings.cancelText);
-
             // main box (FIXED — gradient override)
             const mainBox = document.querySelector('.SecondLoop.vip');
             const mainBoxh2 = document.querySelector('#SecondLooph');

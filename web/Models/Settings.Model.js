@@ -16,6 +16,10 @@ const settingsSchema = new mongoose.Schema(
     submitText: { type: String, default: '#FFFFFF' },
     cancelBg: { type: String, default: '#F9FAFB' },
     cancelText: { type: String, default: '#64748B' },
+
+    address: {
+      type: String,
+    }
   },
   { timestamps: true }
 );
