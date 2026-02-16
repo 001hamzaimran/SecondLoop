@@ -176,7 +176,7 @@
 
 .preview-sub {
     margin: 0 0 12px 0;
-    color: rgba(255, 255, 255, 0.85);
+    color: var(--main-text);
 }
 
 .preview-buttons .preview-btn {

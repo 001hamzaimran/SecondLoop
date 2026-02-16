@@ -1,7 +1,8 @@
+// script.js - updated
 console.log("Second Loop extension script loaded");
 
 (function () {
-    try { console.log("Second Loop extension script executing", window.currentShopifyCustomer && window.currentShopifyCustomer.id); } catch (e) {}
+    try { console.log("Second Loop extension script executing", window.currentShopifyCustomer && window.currentShopifyCustomer.id); } catch (e) { }
 
     const openBtn = document.getElementById("second-loop-button");
     const modal = document.getElementById("second-loop-modal");
@@ -24,10 +25,156 @@ console.log("Second Loop extension script loaded");
 
     // ---------- state ----------
     let currentFiles = [];
-    let allProducts = []; 
+    let allProducts = [];
     let suggestionTimeout = null;
     let productsLoaded = false;
     let selectedProducts = [];
+
+    // ---------- settings state ----------
+    let settingsLoaded = false;
+    const defaultSettings = {
+        mainBg: "#0f172a",
+        mainText: "#ffffff",
+        btnBg: "#f8fafc",
+        btnText: "#0f172a",
+        headingBg: "#94a3b8",
+        headingText: "#0f172a",
+        submitBg: "#10b981",
+        submitText: "#ffffff",
+        cancelBg: "#ef4444",
+        cancelText: "#ffffff"
+    };
+
+    /**
+     * Fetch settings from backend and apply them to UI.
+     * Endpoint: GET /apps/secondloop/setting-color
+     */
+    async function loadAndApplySettings() {
+        if (settingsLoaded) return;
+        try {
+            const res = await fetch("/apps/secondloop/setting-color", { method: "GET", credentials: "same-origin" });
+            if (!res.ok) throw new Error(`Settings fetch failed ${res.status}`);
+            const json = await res.json();
+            const s = (json && json.success && json.data) ? json.data : (json && json.data) ? json.data : null;
+
+            const settings = Object.assign({}, defaultSettings, s || {});
+            applySettings(settings);
+            settingsLoaded = true;
+            console.log("SecondLoop settings applied", settings);
+        } catch (err) {
+            // fallback to defaults (do not break UI)
+            console.warn("Could not load settings, using defaults:", err);
+            applySettings(defaultSettings);
+            settingsLoaded = true; // mark as tried to avoid repeated network spam
+        }
+    }
+
+    /**
+     * Apply setting object to DOM:
+     * - set CSS variables on :root
+     * - directly style main box, button, modal header, submit & cancel buttons
+     */
+    function applySettings(settings) {
+        try {
+            const root = document.documentElement;
+
+            // set css variables (useful for future styling)
+            root.style.setProperty('--sl-main-bg', settings.mainBg || defaultSettings.mainBg);
+            root.style.setProperty('--sl-main-text', settings.mainText || defaultSettings.mainText);
+            root.style.setProperty('--sl-btn-bg', settings.btnBg || defaultSettings.btnBg);
+            root.style.setProperty('--sl-btn-text', settings.btnText || defaultSettings.btnText);
+            root.style.setProperty('--sl-heading-bg', settings.headingBg || defaultSettings.headingBg);
+            root.style.setProperty('--sl-heading-text', settings.headingText || defaultSettings.headingText);
+            root.style.setProperty('--sl-submit-bg', settings.submitBg || defaultSettings.submitBg);
+            root.style.setProperty('--sl-submit-text', settings.submitText || defaultSettings.submitText);
+            root.style.setProperty('--sl-cancel-bg', settings.cancelBg || defaultSettings.cancelBg);
+            root.style.setProperty('--sl-cancel-text', settings.cancelText || defaultSettings.cancelText);
+
+            // main box (FIXED — gradient override)
+            const mainBox = document.querySelector('.SecondLoop.vip');
+            const mainBoxh2 = document.querySelector('#SecondLooph');
+            if (mainBox) {
+
+                mainBox.style.setProperty(
+                    'background',
+                    settings.mainBg || defaultSettings.mainBg,
+                    'important'
+                );
+
+                mainBox.style.backgroundImage = 'none';
+
+                mainBox.style.setProperty(
+                    'color',
+                    settings.mainText || defaultSettings.mainText,
+                    'important'
+                );
+                mainBoxh2.style.setProperty(
+                    'color',
+                    settings.mainText || defaultSettings.mainText,
+                    'important'
+                );
+                mainBoxh2.style.color = settings.mainText || defaultSettings.mainText;
+                // remove !important requirement: inline styles take precedence
+            }
+
+            // main button inside the box
+            const mainButton = document.getElementById('second-loop-button');
+            if (mainButton) {
+                // apply strong inline styles (overrides Liquid inline if any)
+                mainButton.style.setProperty(
+                    'background',
+                    settings.btnBg,
+                    'important'
+                );
+
+                mainButton.style.backgroundImage = 'none';
+
+                mainButton.style.color = settings.btnText
+                mainButton.style.color = settings.btnText || defaultSettings.btnText;
+                // remove !important requirement: inline styles take precedence
+            }
+
+            // modal header
+            const modalHeader = document.querySelector('.secondloop-modal-header');
+            const modalhead = document.querySelector('#sl-modal-title');
+            if (modalHeader) {
+                modalHeader.style.background = settings.headingBg || defaultSettings.headingBg;
+                modalhead.style.color = settings.headingText || defaultSettings.headingText;
+            }
+
+            // submit button
+            const submitEl = document.getElementById('sl-submit');
+            if (submitEl) {
+                submitEl.style.background = settings.submitBg || defaultSettings.submitBg;
+                submitEl.style.color = settings.submitText || defaultSettings.submitText;
+                // if button has class-based styles, inline override ensures color
+            }
+
+            // cancel button
+            const cancelEl = document.getElementById('sl-cancel');
+            if (cancelEl) {
+                cancelEl.style.backgroundColor = settings.cancelBg || defaultSettings.cancelBg;
+                cancelEl.style.color = settings.cancelText || defaultSettings.cancelText;
+            }
+
+            // also attempt to style other matching buttons (in case multiple elements)
+            document.querySelectorAll('.vip-btn').forEach(btn => {
+                btn.style.backgroundColor = settings.submitBg || defaultSettings.submitBg;
+                btn.style.color = settings.submitText || defaultSettings.submitText;
+            });
+            document.querySelectorAll('.vip-btn-secondary').forEach(btn => {
+                btn.style.backgroundColor = settings.cancelBg || defaultSettings.cancelBg;
+                btn.style.color = settings.cancelText || defaultSettings.cancelText;
+            });
+        } catch (err) {
+            console.warn("applySettings failed", err);
+        }
+    }
+
+    // Call immediately to apply settings as soon as possible (won't block UI)
+    loadAndApplySettings();
+
+    // ------------------ existing modal logic (unchanged) ------------------
 
     function showModal() {
         modal.setAttribute("aria-hidden", "false");
@@ -38,6 +185,11 @@ console.log("Second Loop extension script loaded");
         document.addEventListener("keydown", onKeyDown);
 
         loadProductsOnce();
+
+        // ensure settings applied before showing modal header (in case initial fetch didn't finish)
+        if (!settingsLoaded) {
+            loadAndApplySettings();
+        }
     }
 
     function hideModal() {

@@ -38,42 +38,6 @@ export const getProducts = async (req, res) => {
     }
 };
 
-// export const getProductById = async (req, res) => {
-//     try {
-//         const session = res.locals.shopify?.session;
-//         if (!session) {
-//             return res.status(401).json({ error: "No Session Found" });
-//         }
-
-//         const client = new shopify.api.clients.Graphql({ session: res.locals.shopify?.session });
-//         const { id } = req.params;
-//         const { body } = await client.query({
-//             data: {
-//                 "query": `query ProductMetafields($ownerId: ID!) {
-//       product(id: $ownerId) {
-//         metafields(first: 3) {
-//           edges {
-//             node {
-//               namespace
-//               key
-//               value
-//             }
-//           }
-//         }
-//       }
-//     }`,
-//                 variables: { ownerId: `gid://shopify/Product/${id}` }
-//             },
-//         });
-
-//         return res.json(body?.data?.product?.metafields?.edges);
-
-//     } catch (error) {
-//         console.log(error, "<<< error")
-//         return res.status(500).json({ error: "failed to fetch product metafields" });
-//     }
-// }
-
 export const getProductById = async (req, res) => {
     try {
         const session = res.locals.shopify?.session;

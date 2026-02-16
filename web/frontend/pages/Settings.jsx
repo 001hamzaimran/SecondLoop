@@ -1,8 +1,7 @@
-// File: Settings.jsx
 import React, { useState, useEffect } from 'react';
 import './Settings.css';
 
-export default function Settings({ initial = {}, onSave }) {
+export default function Settings({ initial = {}, onSave, apiBase = '/api/setting-color' }) {
     // sensible defaults if not provided
     const defaults = {
         mainBg: initial.mainBg || '#0f172a',
@@ -31,6 +30,8 @@ export default function Settings({ initial = {}, onSave }) {
     const [cancelText, setCancelText] = useState(defaults.cancelText);
 
     const [saved, setSaved] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         // remove saved indicator after 2s
@@ -40,7 +41,56 @@ export default function Settings({ initial = {}, onSave }) {
         }
     }, [saved]);
 
-    const handleSave = () => {
+    // fetch current settings from backend on mount
+    useEffect(() => {
+        let mounted = true;
+
+        async function fetchSettings() {
+            setLoading(true);
+            try {
+                const res = await fetch(apiBase, { method: 'GET' });
+                const json = await res.json();
+                if (!mounted) return;
+
+                if (json && json.success && json.data) {
+                    const d = json.data;
+                    // update individual states (fallback to defaults if missing)
+                    setMainBg(d.mainBg ?? defaults.mainBg);
+                    setMainText(d.mainText ?? defaults.mainText);
+                    setBtnText(d.btnText ?? defaults.btnText);
+                    setBtnBg(d.btnBg ?? defaults.btnBg);
+                    setHeadingBg(d.headingBg ?? defaults.headingBg);
+                    setHeadingText(d.headingText ?? defaults.headingText);
+                    setSubmitBg(d.submitBg ?? defaults.submitBg);
+                    setSubmitText(d.submitText ?? defaults.submitText);
+                    setCancelBg(d.cancelBg ?? defaults.cancelBg);
+                    setCancelText(d.cancelText ?? defaults.cancelText);
+                } else {
+                    // if backend didn't return data, ensure UI uses defaults
+                    setMainBg(defaults.mainBg);
+                    setMainText(defaults.mainText);
+                    setBtnText(defaults.btnText);
+                    setBtnBg(defaults.btnBg);
+                    setHeadingBg(defaults.headingBg);
+                    setHeadingText(defaults.headingText);
+                    setSubmitBg(defaults.submitBg);
+                    setSubmitText(defaults.submitText);
+                    setCancelBg(defaults.cancelBg);
+                    setCancelText(defaults.cancelText);
+                }
+            } catch (err) {
+                console.error('Failed to fetch settings:', err);
+            } finally {
+                if (mounted) setLoading(false);
+            }
+        }
+
+        fetchSettings();
+        return () => { mounted = false; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // run once
+
+    const handleSave = async () => {
         const payload = {
             mainBg,
             mainText,
@@ -54,15 +104,45 @@ export default function Settings({ initial = {}, onSave }) {
             cancelText
         };
 
-        // call parent callback if provided
+        // call parent callback if provided (optional, local-only)
         if (typeof onSave === 'function') onSave(payload);
 
-        // temporary UX: show saved and log
-        console.log('Settings saved', payload);
-        setSaved(true);
+        // save to backend
+        setSaving(true);
+        try {
+            const res = await fetch(apiBase, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const json = await res.json();
+            if (json && json.success && json.data) {
+                const d = json.data;
+                // update states from returned data (ensures saved canonical values)
+                setMainBg(d.mainBg ?? payload.mainBg);
+                setMainText(d.mainText ?? payload.mainText);
+                setBtnText(d.btnText ?? payload.btnText);
+                setBtnBg(d.btnBg ?? payload.btnBg);
+                setHeadingBg(d.headingBg ?? payload.headingBg);
+                setHeadingText(d.headingText ?? payload.headingText);
+                setSubmitBg(d.submitBg ?? payload.submitBg);
+                setSubmitText(d.submitText ?? payload.submitText);
+                setCancelBg(d.cancelBg ?? payload.cancelBg);
+                setCancelText(d.cancelText ?? payload.cancelText);
+
+                setSaved(true);
+            } else {
+                console.error('Save failed:', json);
+            }
+        } catch (err) {
+            console.error('Error saving settings:', err);
+        } finally {
+            setSaving(false);
+        }
     };
 
-    const handleReset = () => {
+    const handleReset = async () => {
+        // update UI to defaults first (instant feedback)
         setMainBg(defaults.mainBg);
         setMainText(defaults.mainText);
         setBtnText(defaults.btnText);
@@ -73,7 +153,55 @@ export default function Settings({ initial = {}, onSave }) {
         setSubmitText(defaults.submitText);
         setCancelBg(defaults.cancelBg);
         setCancelText(defaults.cancelText);
+
+        // persist defaults to backend (PUT)
+        setSaving(true);
+        try {
+            const res = await fetch(apiBase, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(defaults)
+            });
+            const json = await res.json();
+            if (json && json.success && json.data) {
+                setSaved(true);
+                // in case backend returns slightly different values, sync them
+                const d = json.data;
+                setMainBg(d.mainBg ?? defaults.mainBg);
+                setMainText(d.mainText ?? defaults.mainText);
+                setBtnText(d.btnText ?? defaults.btnText);
+                setBtnBg(d.btnBg ?? defaults.btnBg);
+                setHeadingBg(d.headingBg ?? defaults.headingBg);
+                setHeadingText(d.headingText ?? defaults.headingText);
+                setSubmitBg(d.submitBg ?? defaults.submitBg);
+                setSubmitText(d.submitText ?? defaults.submitText);
+                setCancelBg(d.cancelBg ?? defaults.cancelBg);
+                setCancelText(d.cancelText ?? defaults.cancelText);
+            } else {
+                console.error('Reset failed:', json);
+            }
+        } catch (err) {
+            console.error('Error resetting settings:', err);
+        } finally {
+            setSaving(false);
+        }
     };
+
+    // If loading, show minimal message but keep UI structure intact
+    if (loading) {
+        return (
+            <div className="sl-settings-root">
+                <div className="sl-settings-grid">
+                    <section className="sl-card sl-controls">
+                        <header className="sl-card-header">
+                            <h1>Second Loop — Visual Settings</h1>
+                            <p className="muted">Loading settings…</p>
+                        </header>
+                    </section>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="sl-settings-root">
@@ -162,8 +290,16 @@ export default function Settings({ initial = {}, onSave }) {
                     </div>
 
                     <div className="sl-actions-bottom">
-                        <button className="sl-btn sl-btn-primary" onClick={handleSave}>{saved ? 'Saved' : 'Save Changes'}</button>
-                        <button className="sl-btn sl-btn-ghost" onClick={handleReset}>Reset</button>
+                        <button
+                            className="sl-btn sl-btn-primary"
+                            onClick={handleSave}
+                            disabled={saving}
+                        >
+                            {saving ? 'Saving…' : (saved ? 'Saved' : 'Save Changes')}
+                        </button>
+                        <button className="sl-btn sl-btn-ghost" onClick={handleReset} disabled={saving}>
+                            Reset
+                        </button>
                     </div>
                 </section>
             </div>

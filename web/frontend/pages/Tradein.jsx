@@ -612,11 +612,6 @@ export default function Tradein() {
                 </div>
 
                 <div className="meta">
-                  {/* <div>
-                    <strong>Product</strong>
-                    <div className="muted">{selected.product}</div>
-                    {getAllProductNames(selected.products) || "—"}
-                  </div> */}
                   <div className="product-tags">
                     <strong>Product:</strong>
                     {selected.products
