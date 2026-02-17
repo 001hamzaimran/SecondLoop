@@ -61,6 +61,45 @@
     margin-bottom: 12px;
 }
 
+/* text input container */
+.sl-text-input-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+}
+
+/* label text */
+.sl-text-input-field span {
+    font-size: 14px;
+    font-weight: 600;
+    color: #0F172A;
+}
+
+/* main text input */
+.sl-text-input-field input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #CBD5E1;
+    font-size: 14px;
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+
+/* focus effect */
+.sl-text-input-field input:focus {
+    outline: none;
+    border-color: #6366F1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+/* placeholder style */
+.sl-text-input-field input::placeholder {
+    color: #94A3B8;
+}
+
+
 /* textarea container */
 .sl-textarea-field {
     display: flex;

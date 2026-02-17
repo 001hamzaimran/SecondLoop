@@ -1,6 +1,6 @@
 <div class="SecondLoop vip">
   <h2 id="SecondLooph">Welcome to Second Loop!</h2>
-  <p>Submit Trade-In Requests Quickly & Easily.</p>
+  <p id="SecondLoopST">Submit Trade-In Requests Quickly & Easily.</p>
   <button
     id="second-loop-button"
     type="button"
@@ -109,10 +109,17 @@
           <span class="sl-label">Notes / Description (optional)</span>
           <textarea name="notes" id="sl-notes" rows="4"></textarea>
         </label>
-        <div class="sl-address-display">
-          <span>
-            ADDRESS: <span id="address"></span>
-          </span>
+        <div class="sl-important-box">
+          <h4 class="sl-important-title">Important Instructions</h4>
+
+          <p class="sl-important-text">Please send your trade-in item to the following address:</p>
+
+          <p class="sl-important-address">📍 <span id="address"></span></p>
+
+          <p class="sl-important-note">
+            You must include your <strong>Name</strong> and <strong>Email</strong> inside the package so we can identify
+            your trade-in.
+          </p>
         </div>
 
         <div class="sl-actions">

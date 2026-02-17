@@ -34,6 +34,9 @@ console.log("Second Loop extension script loaded");
     // ---------- settings state ----------
     let settingsLoaded = false;
     const defaultSettings = {
+        address: "55 East 10th Street, New York, NY 10003, United States",
+        mainTitle: "Trade In with STORE NAME!",
+        mainSubTitle: "Submit Trade-In Requests Quickly & Easily.",
         mainBg: "#0f172a",
         mainText: "#ffffff",
         btnBg: "#f8fafc",
@@ -95,6 +98,7 @@ console.log("Second Loop extension script loaded");
             // main box (FIXED — gradient override)
             const mainBox = document.querySelector('.SecondLoop.vip');
             const mainBoxh2 = document.querySelector('#SecondLooph');
+            const mainBoxST = document.querySelector('#SecondLoopST');
             if (mainBox) {
 
                 mainBox.style.setProperty(
@@ -110,6 +114,9 @@ console.log("Second Loop extension script loaded");
                     settings.mainText || defaultSettings.mainText,
                     'important'
                 );
+                mainBoxh2.textContent = settings.mainTitle || defaultSettings.mainTitle;
+                mainBoxST.textContent = settings.mainSubTitle || defaultSettings.mainSubTitle;
+                address.textContent = settings.address || defaultSettings.address;
                 mainBoxh2.style.setProperty(
                     'color',
                     settings.mainText || defaultSettings.mainText,

@@ -4,6 +4,8 @@ import './Settings.css';
 export default function Settings({ initial = {}, onSave, apiBase = '/api/setting-color' }) {
     // sensible defaults if not provided
     const defaults = {
+        mainTitle: initial.mainTitle || "Trade In with STORE NAME!",
+        mainSubTitle: initial.mainSubTitle || "Submit Trade-In Requests Quickly & Easily.",
         mainBg: initial.mainBg || '#0f172a',
         mainText: initial.mainText || '#ffffff',
         btnText: initial.btnText || '#0f172a',
@@ -14,9 +16,11 @@ export default function Settings({ initial = {}, onSave, apiBase = '/api/setting
         submitText: initial.submitText || '#ffffff',
         cancelBg: initial.cancelBg || '#ef4444',
         cancelText: initial.cancelText || '#ffffff',
-        address: initial.address || "office address goes here"
+        address: initial.address || "55 East 10th Street, New York, NY 10003, United States"
     };
 
+    const [mainTitle, setMainTitle] = useState(defaults.mainTitle);
+    const [mainSubTitle, setMainSubTitle] = useState(defaults.mainSubTitle);
     const [mainBg, setMainBg] = useState(defaults.mainBg);
     const [mainText, setMainText] = useState(defaults.mainText);
     const [btnText, setBtnText] = useState(defaults.btnText);
@@ -57,6 +61,8 @@ export default function Settings({ initial = {}, onSave, apiBase = '/api/setting
                 if (json && json.success && json.data) {
                     const d = json.data;
                     // update individual states (fallback to defaults if missing)
+                    setMainTitle(d.mainTitle ?? defaults.mainTitle);
+                    setMainSubTitle(d.mainSubTitle ?? defaults.mainSubTitle);
                     setMainBg(d.mainBg ?? defaults.mainBg);
                     setMainText(d.mainText ?? defaults.mainText);
                     setBtnText(d.btnText ?? defaults.btnText);
@@ -70,6 +76,8 @@ export default function Settings({ initial = {}, onSave, apiBase = '/api/setting
                     setAddress(d.address ?? defaults.address);
                 } else {
                     // if backend didn't return data, ensure UI uses defaults
+                    setMainTitle(defaults.mainTitle);
+                    setMainSubTitle(defaults.mainSubTitle);
                     setMainBg(defaults.mainBg);
                     setMainText(defaults.mainText);
                     setBtnText(defaults.btnText);
@@ -96,6 +104,8 @@ export default function Settings({ initial = {}, onSave, apiBase = '/api/setting
 
     const handleSave = async () => {
         const payload = {
+            mainTitle,
+            mainSubTitle,
             mainBg,
             mainText,
             btnText,
@@ -124,6 +134,8 @@ export default function Settings({ initial = {}, onSave, apiBase = '/api/setting
             if (json && json.success && json.data) {
                 const d = json.data;
                 // update states from returned data (ensures saved canonical values)
+                setMainTitle(d.mainTitle ?? payload.mainTitle);
+                setMainSubTitle(d.mainSubTitle ?? payload.mainSubTitle);
                 setMainBg(d.mainBg ?? payload.mainBg);
                 setMainText(d.mainText ?? payload.mainText);
                 setBtnText(d.btnText ?? payload.btnText);
@@ -148,6 +160,8 @@ export default function Settings({ initial = {}, onSave, apiBase = '/api/setting
 
     const handleReset = async () => {
         // update UI to defaults first (instant feedback)
+        setMainTitle(defaults.mainTitle);
+        setMainSubTitle(defaults.mainSubTitle);
         setMainBg(defaults.mainBg);
         setMainText(defaults.mainText);
         setBtnText(defaults.btnText);
@@ -173,6 +187,8 @@ export default function Settings({ initial = {}, onSave, apiBase = '/api/setting
                 setSaved(true);
                 // in case backend returns slightly different values, sync them
                 const d = json.data;
+                setMainTitle(d.mainTitle ?? defaults.mainTitle);
+                setMainSubTitle(d.mainSubTitle ?? defaults.mainSubTitle);
                 setMainBg(d.mainBg ?? defaults.mainBg);
                 setMainText(d.mainText ?? defaults.mainText);
                 setBtnText(d.btnText ?? defaults.btnText);
@@ -220,7 +236,30 @@ export default function Settings({ initial = {}, onSave, apiBase = '/api/setting
                     </header>
 
                     <div className="sl-<strong> sect <strong>ion">
-                        <h2 style={{ marginTop: "10px" }}><strong> Main </strong></h2>
+                        <h2 style={{ marginTop: "10px", marginBottom: "20px" }}><strong> Main </strong></h2>
+
+                        {/* NEW: Main Title & SubTitle */}
+                        <div className="sl-row">
+                            <label className="sl-text-input-field">
+                                <span>Main Title</span>
+                                <input
+                                    type="text"
+                                    value={mainTitle}
+                                    onChange={(e) => setMainTitle(e.target.value)}
+                                    placeholder="Enter main title..."
+                                />
+                            </label>
+
+                            <label className="sl-text-input-field">
+                                <span>Main SubTitle</span>
+                                <input
+                                    type="text"
+                                    value={mainSubTitle}
+                                    onChange={(e) => setMainSubTitle(e.target.value)}
+                                    placeholder="Enter main subtitle..."
+                                />
+                            </label>
+                        </div>
                         <div className="sl-row">
                             <label className="sl-color-field">
                                 <span>Box Background</span>
@@ -350,8 +389,8 @@ export default function Settings({ initial = {}, onSave, apiBase = '/api/setting
                         }}
                     >
                         <div className="preview-inner">
-                            <h2 className="preview-title">Welcome to Second Loop!</h2>
-                            <p className="preview-sub">Submit Trade-In Requests Quickly & Easily.</p>
+                            <h2 className="preview-title">{mainTitle}</h2>
+                            <p className="preview-sub">{mainSubTitle}</p>
 
                             <div className="preview-buttons">
                                 <button className="preview-btn">Trade In Form</button>
