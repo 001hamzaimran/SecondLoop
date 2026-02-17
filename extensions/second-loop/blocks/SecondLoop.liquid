@@ -1,0 +1,143 @@
+<div class="SecondLoop vip">
+  <h2 id="SecondLooph">Welcome to Second Loop!</h2>
+  <p id="SecondLoopST">Submit Trade-In Requests Quickly & Easily.</p>
+  <button
+    id="second-loop-button"
+    type="button"
+  >
+    Trade In Form
+  </button>
+</div>
+
+<!-- YEH ADD KARO LIQUID KE START MEIN -->
+{% if customer %}
+  <script>
+    // Global customer object
+    window.currentShopifyCustomer = {
+      id: '{{ customer.id }}',
+      email: '{{ customer.email }}',
+      name: '{{ customer.name }}',
+      firstName: '{{ customer.first_name }}',
+      lastName: '{{ customer.last_name }}',
+      phone: '{{ customer.phone }}',
+      ordersCount: {{ customer.orders_count }},
+      totalSpent: {{ customer.total_spent | money_without_currency | remove: ',' }}
+    };
+
+    console.log('Liquid Customer Loaded:', window.currentShopifyCustomer);
+  </script>
+{% else %}
+  <script>
+    window.currentShopifyCustomer = null;
+    console.log('Customer not logged in (guest)');
+  </script>
+{% endif %}
+
+<!-- Modal -->
+<div id="second-loop-modal" class="secondloop-modal" aria-hidden="true" role="dialog" aria-labelledby="sl-modal-title">
+  <div class="secondloop-modal-overlay" data-close></div>
+
+  <div class="secondloop-modal-panel vip-panel" role="document">
+    <header class="secondloop-modal-header">
+      <h3 id="sl-modal-title">Trade-in Form</h3>
+      <button class="secondloop-close" id="second-loop-close" aria-label="close form">&times;</button>
+    </header>
+
+    <main class="secondloop-modal-body">
+      <form id="second-loop-form" enctype="multipart/form-data" novalidate>
+        <!-- Customer Info -->
+        <label class="sl-field">
+          <span class="sl-label">Name *</span>
+          <input type="text" name="name" id="sl-name" required>
+          <div class="sl-error" id="err-name"></div>
+        </label>
+
+        <label class="sl-field">
+          <span class="sl-label">Email *</span>
+          <input type="email" name="email" id="sl-email" required>
+          <div class="sl-error" id="err-email"></div>
+        </label>
+
+        <label class="sl-field">
+          <span class="sl-label">Product Name *</span>
+
+          <input type="text" name="product" id="sl-product" required>
+
+          <div class="sl-error" id="err-product"></div>
+
+          <div id="sl-product-suggestions" class="sl-suggestions"></div>
+
+          <!-- ADD THIS -->
+          <div id="sl-selected-product" class="sl-selected-product-box"></div>
+
+          <input type="hidden" name="product_id" id="sl-product-id">
+        </label>
+
+        <label class="sl-field">
+          <span class="sl-label">Quantity (optional)</span>
+          <input type="number" name="quantity" id="sl-quantity" min="1">
+        </label>
+        <!-- Form ke andar yeh hidden field add karo -->
+        <input type="hidden" name="customer_id" id="customer_id_input">
+
+        <label class="sl-field">
+          <span class="sl-label">Condition *</span>
+          <select name="condition" id="sl-condition" required>
+            <option value="">-- select --</option>
+            <option value="new">New</option>
+            <option value="good">Good</option>
+            <option value="fair">Fair</option>
+            <option value="poor">Poor</option>
+          </select>
+          <div class="sl-error" id="err-condition"></div>
+        </label>
+
+        <label class="sl-field">
+          <span class="sl-label">Images (1–8) *</span>
+          <input type="file" name="images" id="sl-images" accept="image/*" multiple>
+          <div class="sl-hint">You can upload up to 8 images (jpg, png).</div>
+          <div class="sl-error" id="err-images"></div>
+          <div id="sl-image-previews" class="sl-previews" aria-live="polite"></div>
+        </label>
+
+        <label class="sl-field">
+          <input type="checkbox" id="sl-has-box" name="has_box" value="true">
+          <span class="sl-label-inline">I still have the original product box</span>
+        </label>
+
+        <label class="sl-field">
+          <span class="sl-label">Notes / Description (optional)</span>
+          <textarea name="notes" id="sl-notes" rows="4"></textarea>
+        </label>
+        <div class="sl-important-box">
+          <h4 class="sl-important-title">Important Instructions</h4>
+
+          <p class="sl-important-text">Please send your trade-in item to the following address:</p>
+
+          <p class="sl-important-address">📍 <span id="address"></span></p>
+
+          <p class="sl-important-note">
+            You must include your <strong>Name</strong> and <strong>Email</strong> inside the package so we can identify
+            your trade-in.
+          </p>
+        </div>
+
+        <div class="sl-actions">
+          <button type="submit" id="sl-submit" class="vip-btn">Submit My Trade In Request</button>
+          <button type="button" id="sl-cancel" class="vip-btn-secondary">Cancel</button>
+        </div>
+
+        <div id="sl-form-message" class="sl-form-message" role="status" aria-live="polite"></div>
+      </form>
+    </main>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Second Loop",
+  "target": "section",
+  "stylesheet": "style.css",
+  "javascript": "script.js"
+}
+{% endschema %}
