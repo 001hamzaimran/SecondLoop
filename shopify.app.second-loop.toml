@@ -2,7 +2,7 @@
 
 client_id = "6c57dab42c3b0d4744898ef2957bef80"
 name = "second-loop"
-application_url = "https://example.com"
+application_url = "https://second-loop-ac629d6b92ed.herokuapp.com"
 embedded = true
 
 [build]
@@ -17,9 +17,9 @@ scopes = "read_assigned_fulfillment_orders,read_cart_transforms,read_checkout_br
 
 [auth]
 
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://second-loop-ac629d6b92ed.herokuapp.com/api/auth" ]
 
 [app_proxy] 
-url="https://example.com/proxy"
+url="https://second-loop-ac629d6b92ed.herokuapp.com/proxy"
 subpath="secondloop"
 prefix="apps"
