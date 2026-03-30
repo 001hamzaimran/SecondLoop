@@ -6,6 +6,7 @@ import { ContextAuth } from "../contextApi/contextAuth";
 export default function HomePage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [showVideo, setShowVideo] = useState(false);
 
   const state = useContext(ContextAuth);
   const { store, setStore, tradeInReq, setTradeInRequests } = state;
@@ -53,7 +54,8 @@ export default function HomePage() {
 
   async function fetchTradeinRequests() {
     try {
-      const res = await fetch("/api/get-tradein-request");
+      // const res = await fetch("/api/get-tradein-request/");
+      const res = await fetch(`/api/get-tradein-request/${store?.domain || domain}`);
       const data = await res.json();
 
       console.log(data.data, "<<<< data is here");
@@ -126,12 +128,12 @@ export default function HomePage() {
             >
               View Requests
             </button>
-            {/* <button
+            <button
               className="btn secondary"
-              onClick={() => navigate("/tradeinrules")}
+              onClick={() => setShowVideo(true)}
             >
-              Pricing Rules
-            </button> */}
+              Demo Video
+            </button>
           </div>
         </div>
 
@@ -190,6 +192,32 @@ export default function HomePage() {
         </div>
 
       </div>
+
+      {showVideo && (
+        <div className="video-modal" onClick={() => setShowVideo(false)}>
+          <div
+            className="video-box"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="video-close"
+              onClick={() => setShowVideo(false)}
+            >
+              ✕
+            </button>
+
+            <iframe
+              width="100%"
+              height="400"
+              src="https://www.youtube.com/embed/IbLitdFT0HE"
+              title="Demo Video"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

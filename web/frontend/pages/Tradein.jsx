@@ -27,6 +27,18 @@ export default function Tradein() {
   const [overridePrice, setOverridePrice] = useState("");
   const [allowManual, setAllowManual] = useState(true);
 
+  // useEffect(() => {
+  //   async function fetchStore() {
+  //     try {
+  //       const res = await fetch("/api/get-store");
+  //       const store = await res.json();
+  //       setStore(store);
+  //     } catch (error) {
+  //       console.log(error);
+  //     }
+  //   }
+  //   fetchStore();
+  //  }, [])
 
   // get ALL product names for modal
   function getAllProductNames(products = []) {
@@ -78,7 +90,7 @@ export default function Tradein() {
 
   async function fetchTradeinRequests() {
     try {
-      const res = await fetch("/api/get-tradein-request");
+      const res = await fetch(`/api/get-tradein-request/${store?.domain || domain}`);
       const data = await res.json();
 
       console.log(data.data, "<<<< data is here");

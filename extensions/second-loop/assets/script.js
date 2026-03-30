@@ -481,6 +481,7 @@ console.log("Second Loop extension script loaded");
         const fd = new FormData();
         fd.append("name", (document.getElementById("sl-name")?.value || "").trim());
         fd.append("email", (document.getElementById("sl-email")?.value || "").trim());
+        fd.append("domain", Shopify.shop);
         // === CHANGED: DO NOT append single product text field here (avoid mismatch)
         fd.append("quantity", (document.getElementById("sl-quantity")?.value || ""));
         fd.append("condition", (document.getElementById("sl-condition")?.value || ""));

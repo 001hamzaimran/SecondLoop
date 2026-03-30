@@ -2,7 +2,7 @@
 
 client_id = "44147dea212db8ccb77e9705be8d4768"
 name = "second-loop"
-application_url = "https://second-loop-ac629d6b92ed.herokuapp.com"
+application_url = "https://secondloop-bb80f4fadc5c.herokuapp.com"
 embedded = true
 
 [build]
@@ -11,17 +11,17 @@ automatically_update_urls_on_dev = true
 [webhooks]
 api_version = "2026-04"
 
-[[webhooks.subscriptions]]
-uri = "/webhooks/customers/data_request"
-compliance_topics = ["customers/data_request"]
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/data_request"
+  compliance_topics = [ "customers/data_request" ]
 
-[[webhooks.subscriptions]]
-uri = "/webhooks/customers/redact"
-compliance_topics = ["customers/redact"]
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/redact"
+  compliance_topics = [ "customers/redact" ]
 
-[[webhooks.subscriptions]]
-uri = "/webhooks/shop/redact"
-compliance_topics = ["shop/redact"]
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/shop/redact"
+  compliance_topics = [ "shop/redact" ]
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
@@ -29,12 +29,12 @@ scopes = "read_assigned_fulfillment_orders,read_cart_transforms,read_checkout_br
 
 [auth]
 redirect_urls = [
-    "https://second-loop-ac629d6b92ed.herokuapp.com/auth/callback",
-    "https://second-loop-ac629d6b92ed.herokuapp.com/auth/shopify/callback",
-    "https://second-loop-ac629d6b92ed.herokuapp.com/api/auth/callback",
-    ]
+  "https://secondloop-bb80f4fadc5c.herokuapp.com/auth/callback",
+  "https://secondloop-bb80f4fadc5c.herokuapp.com/auth/shopify/callback",
+  "https://secondloop-bb80f4fadc5c.herokuapp.com/api/auth/callback"
+]
 
 [app_proxy]
-url = "https://second-loop-ac629d6b92ed.herokuapp.com/proxy"
+url = "https://secondloop-bb80f4fadc5c.herokuapp.com/proxy"
 subpath = "secondloop"
 prefix = "apps"

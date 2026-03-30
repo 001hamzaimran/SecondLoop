@@ -14,6 +14,7 @@ const createPaybackForm = async (req, res) => {
     const {
       name,
       email,
+      domain,
       customer_id,
       order_id,
       product,      // could be string or array (product titles)
@@ -102,6 +103,7 @@ const createPaybackForm = async (req, res) => {
     const paybackData = {
       name,
       email,
+      domain,
       orderId: order_id,
       shopifyCustomerId: customer_id,
       products,
@@ -141,7 +143,8 @@ const createPaybackForm = async (req, res) => {
 
 const getDataPaybackForm = async (req, res) => {
   try {
-    const paybackFormData = await PaybackModel.find({});
+    const { shop } = req.params;
+    const paybackFormData = await PaybackModel.find({ domain: shop }).sort({ createdAt: -1 });
     res.status(200).json({
       success: true,
       data: paybackFormData

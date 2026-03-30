@@ -22,6 +22,12 @@ const ProductSubSchema = new mongoose.Schema({
 
 const PaybackSchema = new mongoose.Schema(
   {
+    domain: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
     name: {
       type: String,
       required: true,
