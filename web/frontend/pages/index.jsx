@@ -181,13 +181,13 @@ export default function HomePage() {
         </div>
 
         <div className="feature-card">
-          <h3>Payback Engine</h3>
-          <p>Rules-based pricing with auto payout calculation.</p>
+          <h3>Customized</h3>
+          <p>Customized payback form colors.</p>
           <button
             className="link"
-            onClick={() => navigate("/tradeinrules")}
+            onClick={() => navigate("/settings")}
           >
-            Manage rules →
+            Manage settings →
           </button>
         </div>
 

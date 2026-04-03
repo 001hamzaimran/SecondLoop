@@ -18,27 +18,12 @@ export default function Tradein() {
 
   const { country, createdAt, currencyCode, domain, email, storeName, updatedAt, _id } = store;
 
-  console.log(store, "<<< trrade in page store data ")
-
   // modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [overridePrice, setOverridePrice] = useState("");
   const [allowManual, setAllowManual] = useState(true);
-
-  // useEffect(() => {
-  //   async function fetchStore() {
-  //     try {
-  //       const res = await fetch("/api/get-store");
-  //       const store = await res.json();
-  //       setStore(store);
-  //     } catch (error) {
-  //       console.log(error);
-  //     }
-  //   }
-  //   fetchStore();
-  //  }, [])
 
   // get ALL product names for modal
   function getAllProductNames(products = []) {
@@ -54,7 +39,6 @@ export default function Tradein() {
     return unique.join(" || ");
   }
 
-  console.log("selected", selected);
 
   // Helper: return the first Shopify product's name (or empty string)
   function getShopifyProductName(products = []) {
@@ -92,8 +76,6 @@ export default function Tradein() {
     try {
       const res = await fetch(`/api/get-tradein-request/${store?.domain || domain}`);
       const data = await res.json();
-
-      console.log(data.data, "<<<< data is here");
 
       if (!data.success) {
         toast.error("Failed to load trade-in requests");
